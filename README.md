@@ -9,6 +9,6 @@
 - [`backtest.html`](backtest.html) — 11 pair × 6 strategy backtest report
 - [`framework.html`](framework.html) — System design document
 
-Last build: 2026-05-21 21:25
+Last build: 2026-05-21 22:06
 
 `robots.txt` blocks search engine indexing.
