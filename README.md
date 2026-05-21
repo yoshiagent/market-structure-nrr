@@ -6,9 +6,11 @@
 ## Pages
 
 - [`index.html`](index.html) — Daily signal dashboard
+- [`weekly.html`](weekly.html) — Latest weekly summary report
 - [`backtest.html`](backtest.html) — 11 pair × 6 strategy backtest report
 - [`framework.html`](framework.html) — System design document
+- [`weekly/`](weekly/) — Historical weekly reports
 
-Last build: 2026-05-21 22:06
+Last build: 2026-05-21 22:13
 
 `robots.txt` blocks search engine indexing.
