@@ -1,0 +1,1158 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>市場結構 + N-RR 台股交易系統｜框架設計文件 v1.0</title>
+<style>
+  :root{
+    --bg:#080e18; --card:#131f2e; --card2:#0f1a28;
+    --text:#e2e8f0; --muted:#94a3b8; --border:#2d3f55;
+    --blue:#3b82f6; --blue-light:#60a5fa; --blue-soft:#93c5fd;
+    --orange:#fb923c; --green:#4ade80; --red:#f87171;
+    --code-bg:#07111e; --code-text:#7dd3fc;
+    --callout-bg:#0f2040; --callout-border:rgba(59,130,246,0.3);
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth; overflow-x:hidden}
+  body{
+    margin:0; padding:0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft JhengHei", "PingFang TC", sans-serif;
+    background:var(--bg); color:var(--text);
+    line-height:1.7; font-size:15px;
+  }
+  /* Layout */
+  .wrap{display:grid; grid-template-columns: 260px 1fr; min-height:100vh}
+  aside.toc{
+    position:sticky; top:0; align-self:start;
+    height:100vh; overflow-y:auto;
+    background:var(--card2); border-right:1px solid var(--border);
+    padding:24px 18px;
+  }
+  aside.toc h2{
+    margin:0 0 8px; font-size:14px; color:var(--blue-light);
+    letter-spacing:0.05em; text-transform:uppercase;
+  }
+  aside.toc .sub{font-size:12px; color:var(--muted); margin-bottom:18px}
+  aside.toc ol{list-style:none; padding:0; margin:0; counter-reset:item}
+  aside.toc li{counter-increment:item; margin:4px 0}
+  aside.toc a{
+    display:block; padding:6px 8px; border-radius:6px;
+    color:var(--text); text-decoration:none; font-size:13px;
+    border-left:2px solid transparent;
+  }
+  aside.toc a:before{content: counter(item) ". "; color:var(--muted); margin-right:4px}
+  aside.toc a:hover{background:rgba(59,130,246,0.08); border-left-color:var(--blue)}
+  aside.toc a.active{background:rgba(59,130,246,0.12); border-left-color:var(--blue); color:var(--blue-soft)}
+  main{padding:32px 48px; max-width:1100px}
+
+  /* Progress bar */
+  #progress{position:fixed; top:0; left:260px; right:0; height:3px; background:transparent; z-index:1000}
+  #progress > div{height:100%; background:linear-gradient(90deg, var(--blue), var(--orange)); width:0%}
+
+  /* Headers */
+  h1{font-size:30px; margin:0 0 4px; color:#fff; letter-spacing:0.02em}
+  .lede{color:var(--muted); font-size:15px; margin:0 0 32px}
+  h2{
+    font-size:24px; margin:48px 0 16px; padding-bottom:8px;
+    border-bottom:1px solid var(--border); color:#fff;
+  }
+  h3{font-size:18px; margin:28px 0 10px; color:var(--blue-soft)}
+  h4{font-size:15px; margin:18px 0 8px; color:var(--orange)}
+
+  /* Cards & callouts */
+  .card{background:var(--card); border:1px solid var(--border); border-radius:10px; padding:20px 24px; margin:16px 0}
+  .callout{
+    background:var(--callout-bg); border:1px solid var(--callout-border);
+    border-left:4px solid var(--blue);
+    border-radius:8px; padding:14px 18px; margin:14px 0;
+    color:var(--blue-soft);
+  }
+  .callout.warn{border-left-color:var(--orange); color:#fed7aa; background:#2a1810}
+  .callout.danger{border-left-color:var(--red); color:#fecaca; background:#2a0f0f}
+  .callout.good{border-left-color:var(--green); color:#bbf7d0; background:#0f2a18}
+  .callout strong{color:#fff}
+
+  /* Code */
+  pre, code.block{
+    background:var(--code-bg); color:var(--code-text);
+    border:1px solid #1e3a5f; border-radius:8px;
+    padding:14px 18px; margin:12px 0;
+    overflow-x:auto; font-family:"Consolas","Cascadia Code",monospace; font-size:13.5px;
+    line-height:1.55; display:block; white-space:pre;
+  }
+  code{font-family:"Consolas",monospace; color:var(--code-text); background:#0a1726; padding:1px 6px; border-radius:4px; font-size:13px}
+
+  /* Tables */
+  .tbl-wrap{overflow-x:auto; margin:14px 0}
+  table{width:100%; border-collapse:collapse; font-size:14px}
+  th, td{padding:10px 12px; border-bottom:1px solid var(--border); text-align:left; vertical-align:top}
+  th{background:#0e1a2a; color:var(--blue-soft); font-weight:600; white-space:nowrap}
+  tr:hover td{background:rgba(59,130,246,0.04)}
+  td.num{font-family:"Consolas",monospace; color:#fff; text-align:right}
+  .pill{
+    display:inline-block; padding:2px 10px; border-radius:999px;
+    font-size:12px; font-weight:600; letter-spacing:0.02em;
+  }
+  .pill.bull{background:#0f2a18; color:var(--green); border:1px solid #166534}
+  .pill.bear{background:#2a0f0f; color:var(--red); border:1px solid #991b1b}
+  .pill.neu{background:#1f2937; color:var(--muted); border:1px solid var(--border)}
+  .pill.warn{background:#2a1810; color:var(--orange); border:1px solid #9a3412}
+
+  /* Diagram (3-layer) */
+  .layers{display:grid; grid-template-columns:1fr; gap:14px; margin:24px 0}
+  .layer{
+    background:linear-gradient(135deg, var(--card), var(--card2));
+    border:1px solid var(--border); border-left:5px solid var(--blue);
+    border-radius:10px; padding:18px 22px;
+  }
+  .layer.l1{border-left-color:var(--blue)}
+  .layer.l2{border-left-color:var(--orange)}
+  .layer.l3{border-left-color:var(--green)}
+  .layer h3{margin:0 0 8px; color:#fff}
+  .layer .tag{font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:0.08em}
+
+  /* Grid for indicator cards */
+  .grid{display:grid; grid-template-columns:repeat(auto-fit, minmax(260px,1fr)); gap:14px; margin:14px 0}
+  .grid .card{margin:0}
+  .grid .card h4{margin-top:0}
+
+  /* Formula block */
+  .formula{
+    background:var(--code-bg); color:#fff;
+    border-left:4px solid var(--orange);
+    padding:12px 16px; margin:10px 0;
+    font-family:"Consolas",monospace; font-size:14px;
+    border-radius:6px; white-space:pre-wrap; line-height:1.55;
+  }
+  .formula .var{color:var(--orange)}
+  .formula .num{color:var(--green)}
+
+  ul, ol{padding-left:22px}
+  ul li, ol li{margin:6px 0}
+  strong{color:#fff}
+
+  hr{border:none; border-top:1px dashed var(--border); margin:32px 0}
+
+  footer{
+    margin-top:64px; padding:24px 0;
+    border-top:1px solid var(--border);
+    color:var(--muted); font-size:13px;
+  }
+  footer a{color:var(--blue-light)}
+
+  /* Mobile */
+  @media (max-width: 900px){
+    .wrap{grid-template-columns:1fr}
+    aside.toc{position:static; height:auto; border-right:none; border-bottom:1px solid var(--border)}
+    main{padding:24px 18px}
+    #progress{left:0}
+    h1{font-size:24px}
+    h2{font-size:20px}
+  }
+</style>
+</head>
+<body>
+<div id="progress"><div></div></div>
+<div class="wrap">
+
+<aside class="toc">
+  <h2>市場結構 + N-RR</h2>
+  <div class="sub">框架設計文件 v1.0<br>2026-05-21</div>
+  <ol>
+    <li><a href="#sec1">策略哲學</a></li>
+    <li><a href="#sec2">三層架構總覽</a></li>
+    <li><a href="#sec3">第一層：市場結構</a></li>
+    <li><a href="#sec4">市場結構分數與判讀</a></li>
+    <li><a href="#sec5">第二層：N 形波段</a></li>
+    <li><a href="#sec6">第三層：RR 模組</a></li>
+    <li><a href="#sec7">RR 換股邏輯</a></li>
+    <li><a href="#sec8">RR 必要濾網</a></li>
+    <li><a href="#sec9">動態 Z-score 門檻</a></li>
+    <li><a href="#sec10">最終交易決策輸出</a></li>
+    <li><a href="#sec11">回測框架</a></li>
+    <li><a href="#sec12">Excel 欄位設計</a></li>
+    <li><a href="#sec13">Python 資料架構</a></li>
+    <li><a href="#sec14">Dashboard 設計</a></li>
+    <li><a href="#sec15">每日自動更新流程</a></li>
+    <li><a href="#sec16">警示條件</a></li>
+    <li><a href="#sec17">常見錯誤與防呆</a></li>
+    <li><a href="#sec18">AI Agent 擴充模組</a></li>
+    <li><a href="#sec19">開發路線圖</a></li>
+  </ol>
+</aside>
+
+<main>
+
+<h1>市場結構 + N-RR 台股交易系統</h1>
+<p class="lede">框架設計文件 v1.0 ｜ 為 ETF 化、法人化、趨勢延長的台股環境設計的多層次交易系統</p>
+
+<!-- =================================================================== -->
+<section id="sec1">
+<h2>1. 策略哲學</h2>
+
+<div class="callout">
+  <strong>核心信念</strong><br>
+  先判斷<strong>市場環境</strong>，再確認個股<strong>趨勢成立</strong>，最後用 <strong>RR</strong> 決定資金配置到哪一檔相對強勢股。<br>
+  目標不是抄到最低點，而是<strong>趨勢成立後的資金效率最大化</strong>。
+</div>
+
+<h3>與傳統配對交易的差異</h3>
+<div class="tbl-wrap">
+<table>
+  <thead><tr>
+    <th>面向</th><th>傳統 Pair Trading</th><th>市場結構 + N-RR</th>
+  </tr></thead>
+  <tbody>
+    <tr><td>核心假設</td><td>價差會均值回歸</td><td>強勢產業內的資金會輪動</td></tr>
+    <tr><td>持有方向</td><td>市場中性 (多空各一)</td><td>同向多單為主、強弱輪換</td></tr>
+    <tr><td>觸發訊號</td><td>Ratio Z-score 超過門檻立即進場</td><td>極值 + 折返確認 + 分批換股</td></tr>
+    <tr><td>市場環境</td><td>通常忽略大盤方向</td><td>環境不對 (外資主導空頭) 直接停做</td></tr>
+    <tr><td>賺取的錢</td><td>價差收斂</td><td>趨勢報酬 + 輪動超額</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>為什麼這套架構適合現在的台股</h3>
+<ul>
+  <li><strong>ETF 化</strong>：高股息 ETF + 市值型 ETF 受益人破千萬，內資成為長線買盤</li>
+  <li><strong>法人化</strong>：外資期現貨部位 + 投信買超主導日內方向</li>
+  <li><strong>趨勢延長</strong>：AI、HPC、先進封裝題材長線，月線級別波段比短線 mean reversion 容易做</li>
+  <li><strong>強勢產業內輪動</strong>：同題材的股票會「你漲一波我漲一波」，這就是 RR 賺的錢</li>
+</ul>
+</section>
+
+<!-- =================================================================== -->
+<section id="sec2">
+<h2>2. 三層架構總覽</h2>
+
+<div class="layers">
+  <div class="layer l1">
+    <div class="tag">Layer 1 ｜ Market Structure</div>
+    <h3>市場結構</h3>
+    <p>判斷今天市場由誰主導：外資 / ETF 投信 / 壽險 / 匯率流動性。產出 <code>MarketStructureScore</code>，決定<strong>能不能交易</strong>。</p>
+  </div>
+  <div class="layer l2">
+    <div class="tag">Layer 2 ｜ N-Shape Trend</div>
+    <h3>N 形波段</h3>
+    <p>確認個股月/週/日線結構是否進入 N 形上升趨勢。判斷<strong>該不該進場</strong>。</p>
+  </div>
+  <div class="layer l3">
+    <div class="tag">Layer 3 ｜ Relative Rotation</div>
+    <h3>RR 相對輪動</h3>
+    <p>在同一強勢產業中比較兩檔股票的相對強弱，決定<strong>資金放哪一檔</strong>。</p>
+  </div>
+</div>
+
+<div class="callout warn">
+  <strong>三層的順序不可顛倒。</strong><br>
+  若 Layer 1 = 外資主導空頭，<strong>Layer 2/3 全部停做</strong>，只留現金或避險部位。
+</div>
+</section>
+
+<!-- =================================================================== -->
+<section id="sec3">
+<h2>3. 第一層：市場結構</h2>
+
+<h3>3.1 外資指標</h3>
+<div class="grid">
+  <div class="card">
+    <h4>外資現貨買賣超</h4>
+    <p>每日 TWSE/TPEX 三大法人，外資合計買賣超金額（億元）。</p>
+    <code>ForeignSpot_NetBuy</code>
+  </div>
+  <div class="card">
+    <h4>外資期貨淨部位</h4>
+    <p>外資台指期未平倉淨多/空單口數。</p>
+    <code>ForeignFut_NetPosition</code>
+  </div>
+  <div class="card">
+    <h4>外資選擇權 Put/Call</h4>
+    <p>外資台指選擇權 Put / Call 未平倉口數比。</p>
+    <code>ForeignOpt_PCR</code>
+  </div>
+  <div class="card">
+    <h4>外資買賣超 Z-score</h4>
+    <p>過去 60 日外資現貨買賣超的滾動 Z-score。</p>
+    <code>Z_ForeignSpot_60</code>
+  </div>
+  <div class="card">
+    <h4>外資期貨淨空單 Z-score</h4>
+    <p>過去 60 日外資期貨淨部位的滾動 Z-score（淨空為負）。</p>
+    <code>Z_ForeignFut_60</code>
+  </div>
+</div>
+
+<h3>3.2 ETF / 投信指標</h3>
+<div class="grid">
+  <div class="card">
+    <h4>投信買賣超</h4>
+    <p>投信合計買賣超金額（億元）。</p>
+    <code>Trust_NetBuy</code>
+  </div>
+  <div class="card">
+    <h4>ETF 受益人數變化</h4>
+    <p>主要高股息 ETF (0056/00878/00919/00940 等) 與市值型 ETF (0050/006208) 月增率。</p>
+    <code>ETF_HolderMoM</code>
+  </div>
+  <div class="card">
+    <h4>ETF 淨申購/淨贖回</h4>
+    <p>ETF 受益權單位數每日變化，反映實際資金流。</p>
+    <code>ETF_NetFlow</code>
+  </div>
+  <div class="card">
+    <h4>高股息 ETF 成交比重</h4>
+    <p>高股息 ETF 當日成交額 / 大盤成交額。</p>
+    <code>HiDiv_Volume_Pct</code>
+  </div>
+  <div class="card">
+    <h4>市值型 ETF 成交比重</h4>
+    <p>0050/006208 成交額 / 大盤成交額。</p>
+    <code>MktCap_Volume_Pct</code>
+  </div>
+  <div class="card">
+    <h4>投信買超 Z-score</h4>
+    <p>過去 60 日投信買賣超的滾動 Z-score。</p>
+    <code>Z_Trust_60</code>
+  </div>
+</div>
+
+<h3>3.3 壽險 / 長線資金（可選）</h3>
+<div class="callout warn">
+  壽險逐日資料難取得，建議用<strong>代理指標</strong>：10 年期美債殖利率、金融股指數、高股息 ETF 受益人變化。
+</div>
+<ul>
+  <li>壽險資產配置（季報，遞延）</li>
+  <li>10年期美債殖利率 / 台灣10年期公債殖利率</li>
+  <li>金融類指數相對大盤強弱</li>
+  <li>高股息 ETF 受益人月增（代理壽險與長線散戶資金）</li>
+</ul>
+
+<h3>3.4 匯率與流動性</h3>
+<div class="grid">
+  <div class="card">
+    <h4>USD/TWD</h4>
+    <p>新台幣匯率，台幣升值通常伴隨外資匯入。</p>
+    <code>USDTWD</code>
+  </div>
+  <div class="card">
+    <h4>台幣升貶 Z-score</h4>
+    <p>過去 60 日 USDTWD 報酬率的滾動 Z-score（升值為負）。</p>
+    <code>Z_TWD_60</code>
+  </div>
+  <div class="card">
+    <h4>美債殖利率</h4>
+    <p>10Y US Treasury Yield。殖利率快速上行對成長股不利。</p>
+    <code>US10Y</code>
+  </div>
+  <div class="card">
+    <h4>VIX</h4>
+    <p>美股恐慌指數，VIX 走高代表外資避險偏空。</p>
+    <code>VIX</code>
+  </div>
+  <div class="card">
+    <h4>SOX 費城半導體</h4>
+    <p>台股權值股 (台積電/聯發科) 高度連動。</p>
+    <code>SOX</code>
+  </div>
+  <div class="card">
+    <h4>Nasdaq</h4>
+    <p>科技股風向。</p>
+    <code>NDX</code>
+  </div>
+  <div class="card">
+    <h4>TSM ADR</h4>
+    <p>台積電 ADR，反映外資對台股的隔夜情緒。</p>
+    <code>TSM</code>
+  </div>
+</div>
+</section>
+
+<!-- =================================================================== -->
+<section id="sec4">
+<h2>4. 市場結構分數與判讀</h2>
+
+<h3>4.1 ForeignPressureScore（外資壓力分數）</h3>
+<div class="formula">
+ForeignPressureScore =
+  <span class="num">0.30</span> × Z_ForeignSpot_60        <span class="var">// 外資現貨買賣超 Z (買超為正)</span>
++ <span class="num">0.30</span> × (-Z_ForeignFut_60)      <span class="var">// 外資期貨淨空 Z (淨空為負，取負號)</span>
++ <span class="num">0.20</span> × (-Z_TWD_60)             <span class="var">// 台幣升貶 Z (升值為負，取負號 → 升值為正)</span>
++ <span class="num">0.20</span> × Z_SOX_or_TSM_ADR_Ret_60 <span class="var">// SOX/TSM ADR 報酬 Z</span>
+</div>
+
+<h3>4.2 ETFSupportScore（內資承接分數）</h3>
+<div class="formula">
+ETFSupportScore =
+  <span class="num">0.35</span> × Z_Trust_60               <span class="var">// 投信買超 Z</span>
++ <span class="num">0.25</span> × Z_ETF_HolderMoM_60       <span class="var">// ETF 受益人月增 Z</span>
++ <span class="num">0.20</span> × Z_HiDiv_Volume_Pct_60    <span class="var">// 高股息 ETF 成交比重 Z</span>
++ <span class="num">0.20</span> × Z_MktDrawdownNarrow_60   <span class="var">// 大盤跌幅收斂程度 Z</span>
+</div>
+
+<div class="callout">
+  <strong>大盤跌幅收斂程度</strong> 的算法：當大盤拉回時，若跌幅遞減 (今日跌 -0.3% 比昨日 -1.2% 收斂) → 給正分。
+  公式範例：<code>MktDrawdownNarrow = -ΔTAIEX_Return</code>，再做 60 日 Z-score。
+</div>
+
+<h3>4.3 MarketStructureScore（市場結構總分）</h3>
+<div class="formula" style="border-left-color:var(--blue)">
+MarketStructureScore = ETFSupportScore − ForeignPressureScore
+</div>
+
+<h3>4.4 判讀對照表</h3>
+<div class="tbl-wrap">
+<table>
+  <thead><tr>
+    <th>分數區間</th><th>環境判讀</th><th>策略動作</th><th>建議倉位</th>
+  </tr></thead>
+  <tbody>
+    <tr><td class="num">&gt; +1.0</td><td><span class="pill bull">ETF/內資主導，慢牛環境</span></td><td>積極做多、RR 全開</td><td>80~100%</td></tr>
+    <tr><td class="num">+0.3 ~ +1.0</td><td><span class="pill bull">承接有效，偏多</span></td><td>分批做多、RR 開啟</td><td>50~80%</td></tr>
+    <tr><td class="num">−0.3 ~ +0.3</td><td><span class="pill neu">多空拉鋸</span></td><td>只做 N 形最強股、RR 縮量</td><td>30~50%</td></tr>
+    <tr><td class="num">−1.0 ~ −0.3</td><td><span class="pill warn">外資壓力偏大</span></td><td>停止新進、舊倉收斂</td><td>10~30%</td></tr>
+    <tr><td class="num">&lt; −1.0</td><td><span class="pill bear">外資主導空頭</span></td><td>RR 全停、出清非核心</td><td>0~10%</td></tr>
+  </tbody>
+</table>
+</div>
+</section>
+
+<!-- =================================================================== -->
+<section id="sec5">
+<h2>5. 第二層：N 形波段模組</h2>
+
+<div class="callout">
+  <strong>N 形定義</strong>：第一波上漲 → 回檔不破關鍵支撐 → 再突破前高 → 形成「N」字形態。<br>
+  N 形成立才代表趨勢真的延續，避免只看單日突破就追進。
+</div>
+
+<h3>5.1 月線層 (Macro Trend)</h3>
+<ul>
+  <li><strong>月 K 脫離盤整區</strong>：過去 6~12 個月的箱型上緣被突破</li>
+  <li><strong>月線低檔轉強</strong>：MA12 (12 月 MA) 由下彎轉為持平 / 向上</li>
+  <li><strong>月線量能放大</strong>：突破月 K 的量 ≥ 過去 12 個月平均量 × 1.5</li>
+  <li><strong>月線不破前低</strong>：回檔最低點高於前一次明顯低點</li>
+</ul>
+
+<h3>5.2 週線層 (Trend Confirmation)</h3>
+<ul>
+  <li><strong>週 MA20 向上</strong>：週線級別 20 週均線斜率為正</li>
+  <li><strong>股價回測週 MA20 不破，或跌破後重新站回</strong></li>
+  <li><strong>週 K 高低點墊高</strong>：HH (Higher High) + HL (Higher Low) 連續 2 組以上</li>
+  <li><strong>週量價結構健康</strong>：上漲週量 &gt; 下跌週量</li>
+</ul>
+
+<h3>5.3 日線層 (Entry Trigger)</h3>
+<ul>
+  <li><strong>日線回測 MA20 / MA60</strong>：回到均線附近，未跌破</li>
+  <li><strong>突破前高</strong>：以收盤價突破過去 N 日高點</li>
+  <li><strong>回測不破</strong>：突破後若拉回，低點不破突破點</li>
+  <li><strong>量縮整理、量增突破</strong>：整理時量縮、突破時量增至 5 日均量 × 1.5 以上</li>
+</ul>
+
+<h3>5.4 N 形狀態判定</h3>
+<div class="tbl-wrap">
+<table>
+  <thead><tr><th>狀態</th><th>判定條件</th><th>動作</th></tr></thead>
+  <tbody>
+    <tr><td><span class="pill neu">未成立</span></td><td>月/週線結構未滿足</td><td>觀察，不動作</td></tr>
+    <tr><td><span class="pill warn">第一波形成中</span></td><td>突破盤整但未回檔</td><td>觀察，等回檔</td></tr>
+    <tr><td><span class="pill warn">回測中</span></td><td>回測週 MA20 或前高位置</td><td>準備分批進場</td></tr>
+    <tr><td><span class="pill bull">N 形成立</span></td><td>回測不破 + 再突破前高</td><td>進場主力部位</td></tr>
+    <tr><td><span class="pill bear">N 形失敗</span></td><td>跌破回測低點 + 跌破週 MA20</td><td>出場停損</td></tr>
+  </tbody>
+</table>
+</div>
+</section>
+
+<!-- =================================================================== -->
+<section id="sec6">
+<h2>6. 第三層：RR 模組</h2>
+
+<div class="callout">
+  <strong>RR = Relative Rotation，不是傳統 Pair Trading。</strong><br>
+  目的：在同一強勢產業中，把資金配置到<strong>相對更有優勢</strong>的股票，提高超額報酬。
+</div>
+
+<h3>6.1 已開發配對清單 (台股)</h3>
+<div class="tbl-wrap">
+<table>
+  <thead><tr><th>配對</th><th>產業 / 題材</th><th>代號</th></tr></thead>
+  <tbody>
+    <tr><td>南電 vs 欣興</td><td>ABF 載板</td><td>8046 / 3037</td></tr>
+    <tr><td>光寶科 vs 台達電</td><td>電源 / AI 伺服器</td><td>2301 / 2308</td></tr>
+    <tr><td>巨大 vs 美利達</td><td>自行車</td><td>9921 / 9914</td></tr>
+    <tr><td>奇鋐 vs 雙鴻</td><td>散熱模組 / AI 散熱</td><td>3017 / 3324</td></tr>
+    <tr><td>廣達 vs 緯創</td><td>AI 伺服器代工</td><td>2382 / 3231</td></tr>
+    <tr><td>台光電 vs 聯茂</td><td>CCL 銅箔基板</td><td>2383 / 6213</td></tr>
+    <tr><td>南亞科 vs 華邦電</td><td>記憶體</td><td>2408 / 2344</td></tr>
+    <tr><td>上銀 vs 大銀微</td><td>滾珠螺桿 / 自動化</td><td>2049 / 4576</td></tr>
+    <tr><td>金像電 vs 燿華</td><td>PCB / 伺服器板</td><td>2368 / 2367</td></tr>
+    <tr><td>所羅 vs 華晶科</td><td>影像感測</td><td>2359 / 3059</td></tr>
+    <tr><td>廣達 vs 達明</td><td>機器人 / AI 集團</td><td>2382 / 4585</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>6.2 RR 指標公式</h3>
+<div class="formula">
+<span class="var">// 兩種計算方式擇一</span>
+Ratio  = Stock_A_Close / Stock_B_Close
+Spread = Stock_A_Return − Stock_B_Return
+
+<span class="var">// 衍生指標</span>
+Ratio_MA20      = MA(Ratio, <span class="num">20</span>)
+Ratio_MA60      = MA(Ratio, <span class="num">60</span>)
+Ratio_Z60       = (Ratio − Ratio_MA60) / Ratio_Std60
+Ratio_MA20_Slope = Ratio_MA20.diff(<span class="num">5</span>)
+Ratio_MA60_Slope = Ratio_MA60.diff(<span class="num">10</span>)
+RS_Break        = Ratio &gt; max(Ratio[-<span class="num">60</span>:-1])
+RS_Pullback     = Ratio &lt; Ratio_MA20 &amp; Ratio_Z60 &gt; <span class="num">0</span>
+</div>
+
+<h3>6.3 RR 狀態</h3>
+<div class="tbl-wrap">
+<table>
+  <thead><tr><th>狀態</th><th>判定</th><th>意義</th></tr></thead>
+  <tbody>
+    <tr><td><span class="pill bull">A 強</span></td><td>Z60 &gt; 0 且 Ratio 向上</td><td>資金集中 A</td></tr>
+    <tr><td><span class="pill bear">B 強</span></td><td>Z60 &lt; 0 且 Ratio 向下</td><td>資金集中 B</td></tr>
+    <tr><td><span class="pill warn">極值 (A 過強)</span></td><td>Z60 &gt; +2</td><td>注意換股訊號</td></tr>
+    <tr><td><span class="pill warn">極值 (B 過強)</span></td><td>Z60 &lt; −2</td><td>注意換股訊號</td></tr>
+    <tr><td><span class="pill neu">折返中</span></td><td>Ratio 跌破 MA20 但 Z60 仍同號</td><td>進入換股區</td></tr>
+  </tbody>
+</table>
+</div>
+</section>
+
+<!-- =================================================================== -->
+<section id="sec7">
+<h2>7. RR 換股邏輯（分批）</h2>
+
+<div class="callout warn">
+  <strong>不要碰到 Z-score 門檻就立刻換股。</strong><br>
+  Z-score 是「相對強弱已過頭」的訊號，但「過頭」可以一直過頭。<br>
+  正確流程：<strong>極值 → 折返確認 → 分批換股</strong>。
+</div>
+
+<h3>7.1 換股階段（以 A 過強為例）</h3>
+<div class="tbl-wrap">
+<table>
+  <thead><tr><th>階段</th><th>觸發條件</th><th>動作</th><th>說明</th></tr></thead>
+  <tbody>
+    <tr><td>1. 警示</td><td>Z60 &gt; +2</td><td>不動</td><td>A 過強，但趨勢可能繼續</td></tr>
+    <tr><td>2. 第一批</td><td>Z60 &gt; +2 維持 + Ratio 跌破 MA5</td><td>A → B 換 <strong>30%</strong></td><td>短均線轉弱，折返開始</td></tr>
+    <tr><td>3. 第二批</td><td>Ratio 跌破 MA20</td><td>A → B 換 <strong>40%</strong></td><td>中期均線轉弱確認</td></tr>
+    <tr><td>4. 第三批</td><td>Ratio 跌破 MA60 或 Z60 回到 0 以下</td><td>A → B 換剩餘 <strong>30%</strong></td><td>輪動完成</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>7.2 反向 (B 過強) 邏輯對稱</h3>
+<ul>
+  <li>Z60 &lt; −2 → 警示</li>
+  <li>Ratio 站回 MA5 → B → A 換 30%</li>
+  <li>Ratio 站回 MA20 → B → A 換 40%</li>
+  <li>Ratio 站回 MA60 或 Z60 回到 0 以上 → 換剩餘 30%</li>
+</ul>
+
+<h3>7.3 為什麼分批</h3>
+<ul>
+  <li>避免「過頭可以更過頭」：強勢股可能繼續強 1~2 週</li>
+  <li>避免「折返是假動作」：第一批先試水溫</li>
+  <li>降低換股成本：分散在多日進出，吃到平均成交價</li>
+</ul>
+</section>
+
+<!-- =================================================================== -->
+<section id="sec8">
+<h2>8. RR 必要濾網</h2>
+
+<div class="callout danger">
+  <strong>所有濾網必須同時通過，RR 才能執行。</strong><br>
+  缺一不可。寧可不做，不可逆勢。
+</div>
+
+<ol>
+  <li><strong>兩檔股票週 MA20 皆向上</strong> → 確認都在多頭結構</li>
+  <li><strong>兩檔股票皆未跌破主要 N 形結構</strong> → 都還在趨勢內</li>
+  <li><strong>所屬產業仍為強勢產業</strong> → 用產業指數或 ETF 確認</li>
+  <li><strong>市場結構不是外資主導空頭</strong> → <code>MarketStructureScore &gt; −1.0</code></li>
+  <li><strong>Ratio 出現極值後有折返確認</strong> → 不是 Z 一過 ±2 就換</li>
+</ol>
+
+<h3>8.1 應該避免的錯誤</h3>
+<div class="tbl-wrap">
+<table>
+  <thead><tr><th>常見錯誤</th><th>為什麼錯</th><th>正確做法</th></tr></thead>
+  <tbody>
+    <tr><td>逆勢抄弱股</td><td>弱者恆弱，趨勢未終結前抄底會持續虧</td><td>等弱股自己出現 N 形再進</td></tr>
+    <tr><td>太早賣強股</td><td>強勢股可能再強 30~50%</td><td>等 Z60 折返 + Ratio 跌破 MA20</td></tr>
+    <tr><td>把趨勢誤判成均值回歸</td><td>RR 不是 mean reversion，是輪動</td><td>濾網沒過就不做</td></tr>
+    <tr><td>產業已轉弱還在輪動</td><td>整個 sector 都跌，輪動沒意義</td><td>產業指數跌破週 MA20 → 停做 RR</td></tr>
+  </tbody>
+</table>
+</div>
+</section>
+
+<!-- =================================================================== -->
+<section id="sec9">
+<h2>9. 動態 Z-score 門檻</h2>
+
+<div class="callout">
+  Z-score 門檻<strong>不固定</strong>。市場越強，極值越極端；震盪盤門檻要放寬。
+</div>
+
+<h3>9.1 門檻表</h3>
+<div class="tbl-wrap">
+<table>
+  <thead><tr><th>環境</th><th>判定條件</th><th>Z-score 門檻</th></tr></thead>
+  <tbody>
+    <tr><td>強多頭 / ETF 慢牛</td><td>MarketStructureScore &gt; +1.0 且 大盤站上週 MA20</td><td><strong>±2.5 ~ ±3.0</strong></td></tr>
+    <tr><td>一般盤</td><td>MarketStructureScore −0.3 ~ +1.0</td><td><strong>±2.0</strong></td></tr>
+    <tr><td>空頭震盪</td><td>MarketStructureScore &lt; −0.3</td><td><strong>±1.5</strong></td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>9.2 門檻調整邏輯</h3>
+<div class="formula">
+<span class="var">def</span> dynamic_z_threshold(market_score, mkt_above_wma20, sector_strong, ratio_slope):
+    base = <span class="num">2.0</span>
+    <span class="var">if</span> market_score &gt; <span class="num">1.0</span> <span class="var">and</span> mkt_above_wma20:
+        base = <span class="num">2.5</span>
+        <span class="var">if</span> sector_strong <span class="var">and</span> ratio_slope &gt; <span class="num">0</span>:
+            base = <span class="num">3.0</span>     <span class="var"># 強到不換</span>
+    <span class="var">elif</span> market_score &lt; -<span class="num">0.3</span>:
+        base = <span class="num">1.5</span>
+    <span class="var">return</span> base
+</div>
+
+<div class="callout warn">
+  <strong>為什麼強多頭門檻要拉高？</strong><br>
+  慢牛環境下強勢股可以一路強上去，過早觸發換股會把最賺的部分讓出去。
+</div>
+</section>
+
+<!-- =================================================================== -->
+<section id="sec10">
+<h2>10. 最終交易決策輸出</h2>
+
+<h3>10.1 每日輸出格式（每檔股票或每組 RR）</h3>
+<pre>
+日期：2026-05-21
+---
+[市場結構]
+  MarketStructureScore: +0.85  →  承接有效，偏多
+  ForeignPressureScore: −0.42
+  ETFSupportScore:      +0.43
+  USDTWD: 30.42  (升 -0.08%)
+  TSM ADR: +1.2%
+
+[個股：奇鋐 3017]
+  N 形狀態：成立 (週MA20向上 / 突破前高 / 量增)
+  日線位置：站上 MA20，距前高 +2.3%
+
+[RR：奇鋐 3017 vs 雙鴻 3324]
+  Ratio:        3.245
+  Ratio_MA20:   3.180
+  Ratio_Z60:    +1.82
+  RR 狀態：A 強，未達極值
+  動態門檻：    ±2.5 (強多頭環境)
+
+[建議動作]
+  3017：持有 (N 形未破)
+  3324：觀察 (N 形成立中，等回測)
+  RR：    不換股 (Z 未達門檻)
+</pre>
+
+<h3>10.2 動作分類</h3>
+<div class="tbl-wrap">
+<table>
+  <thead><tr><th>動作</th><th>觸發</th><th>說明</th></tr></thead>
+  <tbody>
+    <tr><td><span class="pill bull">持有</span></td><td>N 形完整 + 趨勢未破</td><td>不動</td></tr>
+    <tr><td><span class="pill neu">觀察</span></td><td>N 形成立中</td><td>等下一個訊號</td></tr>
+    <tr><td><span class="pill warn">分批換股</span></td><td>RR 觸發換股階段</td><td>依 7.1 分批</td></tr>
+    <tr><td><span class="pill warn">降低部位</span></td><td>市場結構轉弱</td><td>砍 30~50%</td></tr>
+    <tr><td><span class="pill bear">停止 RR</span></td><td>產業轉弱 或 市場主導空頭</td><td>全部現金化</td></tr>
+  </tbody>
+</table>
+</div>
+</section>
+
+<!-- =================================================================== -->
+<section id="sec11">
+<h2>11. 回測框架</h2>
+
+<div class="callout danger">
+  <strong>Look-ahead Bias 必須避免。</strong><br>
+  所有指標 <code>t</code> 日的訊號，只能使用 <code>t-1</code> 日（含）以前的資料。
+</div>
+
+<h3>11.1 回測項目</h3>
+<ol>
+  <li><strong>單純 N 形策略</strong>：忽略市場結構與 RR，只看 N 形進出</li>
+  <li><strong>單純 RR 策略</strong>：忽略市場結構，只看 Ratio Z60 + 分批換股</li>
+  <li><strong>市場結構 + N 形</strong>：加上市場結構過濾</li>
+  <li><strong>市場結構 + N + RR (完整版)</strong>：三層全開</li>
+</ol>
+
+<h3>11.2 評估指標</h3>
+<div class="tbl-wrap">
+<table>
+  <thead><tr><th>指標</th><th>意義</th><th>目標</th></tr></thead>
+  <tbody>
+    <tr><td>年化報酬</td><td>CAGR</td><td>&gt; Buy &amp; Hold</td></tr>
+    <tr><td>最大回撤 (MDD)</td><td>峰值到谷底的最大跌幅</td><td>&lt; 大盤 MDD × 0.7</td></tr>
+    <tr><td>Sharpe Ratio</td><td>風險調整後報酬</td><td>&gt; 1.0 (台股月線級別)</td></tr>
+    <tr><td>勝率</td><td>賺錢交易 / 總交易</td><td>&gt; 55%</td></tr>
+    <tr><td>盈虧比</td><td>平均盈利 / 平均虧損</td><td>&gt; 1.5</td></tr>
+    <tr><td>平均持有天數</td><td>單筆持有時間</td><td>20~60 日 (波段)</td></tr>
+    <tr><td>換股頻率</td><td>每月換股次數</td><td>&lt; 4 次/月</td></tr>
+    <tr><td>超額報酬 (Alpha)</td><td>策略報酬 − Buy &amp; Hold</td><td>&gt; +5% 年化</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>11.3 回測流程（虛擬碼）</h3>
+<div class="formula">
+<span class="var">for</span> date <span class="var">in</span> backtest_dates:
+    <span class="var"># 1. 只用 date 之前的資料計算所有指標</span>
+    market_score = calc_market_structure(data.loc[:date-<span class="num">1</span>])
+
+    <span class="var">for</span> pair <span class="var">in</span> pairs:
+        n_state_A = calc_n_shape(data[A].loc[:date-<span class="num">1</span>])
+        n_state_B = calc_n_shape(data[B].loc[:date-<span class="num">1</span>])
+        rr_state  = calc_rr(data[A], data[B], date-<span class="num">1</span>)
+        z_thresh  = dynamic_z_threshold(market_score, ...)
+
+        action = decision_engine(market_score, n_state_A, n_state_B, rr_state, z_thresh)
+        execute(action, date)   <span class="var"># 在 date 開盤價成交</span>
+
+    portfolio.update(date)
+
+backtest_report(portfolio)
+</div>
+</section>
+
+<!-- =================================================================== -->
+<section id="sec12">
+<h2>12. Excel 欄位設計</h2>
+
+<h3>12.1 工作表結構</h3>
+<div class="tbl-wrap">
+<table>
+  <thead><tr><th>工作表</th><th>用途</th><th>更新頻率</th></tr></thead>
+  <tbody>
+    <tr><td><code>Market</code></td><td>市場結構日資料 + 分數</td><td>每日</td></tr>
+    <tr><td><code>Foreign</code></td><td>外資現貨/期貨/選擇權</td><td>每日</td></tr>
+    <tr><td><code>ETF</code></td><td>ETF 受益人 / 申贖 / 成交比重</td><td>每日</td></tr>
+    <tr><td><code>Stocks</code></td><td>個股日資料 + N 形狀態</td><td>每日</td></tr>
+    <tr><td><code>RR_南電欣興</code> ... (每組一張)</td><td>RR 指標 + 狀態 + 訊號</td><td>每日</td></tr>
+    <tr><td><code>Signal</code></td><td>每日交易訊號彙整</td><td>每日</td></tr>
+    <tr><td><code>Backtest</code></td><td>回測結果與績效</td><td>批次</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>12.2 Market 工作表欄位</h3>
+<div class="formula">
+日期 | TAIEX | TAIEX_WMA20 | ForeignSpot_NetBuy | Z_ForeignSpot_60
+    | ForeignFut_NetPos | Z_ForeignFut_60 | Trust_NetBuy | Z_Trust_60
+    | ETF_HolderMoM | Z_ETF_HolderMoM | HiDiv_Vol_Pct | Z_HiDiv_Vol_Pct
+    | USDTWD | Z_TWD_60 | SOX | Z_SOX_60 | TSM_ADR | VIX
+    | ForeignPressureScore | ETFSupportScore | MarketStructureScore
+    | MarketRegime <span class="var">// 慢牛/拉鋸/空頭…</span>
+    | DynamicZThreshold
+</div>
+
+<h3>12.3 RR 工作表欄位（每組一張）</h3>
+<div class="formula">
+日期 | A_Close | A_MA20 | A_MA60 | A_WMA20 | A_N_State
+    | B_Close | B_MA20 | B_MA60 | B_WMA20 | B_N_State
+    | Ratio | Ratio_MA20 | Ratio_MA60 | Ratio_Z60
+    | Ratio_MA20_Slope | RR_State
+    | Filter_BothWMA20Up | Filter_NoNBreak | Filter_SectorStrong
+    | Filter_MarketOK | Filter_Pullback
+    | All_Filters_Pass | Action | Position_A_Pct | Position_B_Pct
+</div>
+</section>
+
+<!-- =================================================================== -->
+<section id="sec13">
+<h2>13. Python 資料架構</h2>
+
+<h3>13.1 模組劃分</h3>
+<div class="formula">
+市場結構NRR/
+├── data/
+│   ├── raw/              <span class="var"># yfinance / TWSE 原始資料</span>
+│   ├── processed/        <span class="var"># 計算後的指標</span>
+│   └── signals/          <span class="var"># 每日訊號輸出</span>
+├── src/
+│   ├── fetchers/
+│   │   ├── fetch_price.py        <span class="var"># yfinance 抓股價</span>
+│   │   ├── fetch_3insti.py       <span class="var"># 三大法人</span>
+│   │   ├── fetch_etf.py          <span class="var"># 集保 ETF 受益人</span>
+│   │   ├── fetch_macro.py        <span class="var"># 匯率/債/SOX/VIX</span>
+│   │   └── fetch_futures.py      <span class="var"># 期交所外資期貨</span>
+│   ├── indicators/
+│   │   ├── market_structure.py   <span class="var"># Layer 1 分數</span>
+│   │   ├── n_shape.py            <span class="var"># Layer 2 N 形判定</span>
+│   │   └── rr.py                 <span class="var"># Layer 3 RR 指標</span>
+│   ├── decision.py               <span class="var"># 動作決策引擎</span>
+│   ├── backtest.py               <span class="var"># 回測框架</span>
+│   ├── dashboard.py              <span class="var"># Plotly Dashboard</span>
+│   └── alerts.py                 <span class="var"># 警示輸出</span>
+├── config/
+│   ├── pairs.yaml                <span class="var"># RR 配對清單</span>
+│   └── params.yaml               <span class="var"># 門檻與權重</span>
+├── output/
+│   ├── 市場結構NRR.xlsx
+│   ├── dashboard.html
+│   └── signals/YYYY-MM-DD.json
+└── run_daily.py                  <span class="var"># 每日入口</span>
+</div>
+
+<h3>13.2 pairs.yaml 範例</h3>
+<div class="formula">
+pairs:
+  - name: 南電欣興
+    A: {code: <span class="num">8046</span>, name: 南電}
+    B: {code: <span class="num">3037</span>, name: 欣興}
+    sector: ABF載板
+    sector_idx: TWSE_電子零組件
+  - name: 奇鋐雙鴻
+    A: {code: <span class="num">3017</span>, name: 奇鋐}
+    B: {code: <span class="num">3324</span>, name: 雙鴻}
+    sector: 散熱
+    sector_idx: TWSE_電子零組件
+  - name: 廣達緯創
+    A: {code: <span class="num">2382</span>, name: 廣達}
+    B: {code: <span class="num">3231</span>, name: 緯創}
+    sector: AI伺服器
+    sector_idx: TWSE_電腦及週邊
+  <span class="var"># ... (其餘配對)</span>
+</div>
+
+<h3>13.3 params.yaml 範例</h3>
+<div class="formula">
+market_structure:
+  zscore_window: <span class="num">60</span>
+  weights:
+    foreign_spot: <span class="num">0.30</span>
+    foreign_fut:  <span class="num">0.30</span>
+    twd:          <span class="num">0.20</span>
+    sox:          <span class="num">0.20</span>
+    trust:        <span class="num">0.35</span>
+    etf_holder:   <span class="num">0.25</span>
+    hidiv_vol:    <span class="num">0.20</span>
+    mkt_dd:       <span class="num">0.20</span>
+
+n_shape:
+  monthly_box_lookback: <span class="num">12</span>
+  weekly_ma:            <span class="num">20</span>
+  daily_ma_short:       <span class="num">20</span>
+  daily_ma_long:        <span class="num">60</span>
+
+rr:
+  ratio_ma_short: <span class="num">20</span>
+  ratio_ma_long:  <span class="num">60</span>
+  z_window:       <span class="num">60</span>
+  z_threshold:
+    strong_bull: <span class="num">2.5</span>
+    normal:      <span class="num">2.0</span>
+    bear:        <span class="num">1.5</span>
+  rebalance_steps: [<span class="num">0.3</span>, <span class="num">0.4</span>, <span class="num">0.3</span>]
+</div>
+</section>
+
+<!-- =================================================================== -->
+<section id="sec14">
+<h2>14. Dashboard 設計</h2>
+
+<h3>14.1 結構（單頁 HTML）</h3>
+<div class="formula">
+┌───────────────────────────────────────────────────┐
+│ 頂部 nav-bar  ｜ 最新更新：YYYY-MM-DD             │
+├───────────────────────────────────────────────────┤
+│ [區塊 1] 市場結構儀表板                          │
+│   - MarketStructureScore 大數字 + 環境判讀       │
+│   - ForeignPressureScore / ETFSupportScore 子表  │
+│   - 趨勢圖 (近 60 日分數變化)                    │
+├───────────────────────────────────────────────────┤
+│ [區塊 2] 當日訊號一覽                            │
+│   - 每組 RR：狀態 / Z60 / 動作                    │
+│   - 顏色：綠 持有 / 黃 觀察 / 橘 換股 / 紅 停止   │
+├───────────────────────────────────────────────────┤
+│ [區塊 3] RR 詳細圖（可切換配對）                 │
+│   - Ratio + MA20 + MA60 + Z60                    │
+│   - 兩檔股價對照                                  │
+│   - 訊號標記                                      │
+├───────────────────────────────────────────────────┤
+│ [區塊 4] N 形狀態總覽（所有觀察股）              │
+│   - 表格：股名 / 月/週/日狀態 / 動作              │
+└───────────────────────────────────────────────────┘
+</div>
+
+<h3>14.2 視覺規範（沿用既有圖表系統）</h3>
+<ul>
+  <li>背景 <code>#0d1117</code>，圖表繪圖區 <code>#111827</code>，卡片 <code>#1e293b</code></li>
+  <li>強勢綠 <code>#4ade80</code>、警示橘 <code>#fb923c</code>、危險紅 <code>#f87171</code></li>
+  <li>Plotly 設定：<code>hovermode=False, dragmode=False, displayModeBar=False</code></li>
+  <li>手機適配：<code>width:100vw !important</code> + 透明遮罩攔截觸控</li>
+  <li>自訂游標：<code>Plotly.relayout({shapes:...})</code>，resize 後重繪</li>
+</ul>
+<p class="lede">細節參考 <code>_context/rules/html-preferences.md</code> 與已開發的南電欣興圖表。</p>
+</section>
+
+<!-- =================================================================== -->
+<section id="sec15">
+<h2>15. 每日自動更新流程</h2>
+
+<h3>15.1 流程圖</h3>
+<div class="formula">
+<span class="num">18:00</span> Windows 工作排程器啟動 run_daily.py
+   │
+   ├─→ <span class="var">[1]</span> fetch_price.py    抓 yfinance 個股+大盤+SOX+VIX+TSM ADR
+   ├─→ <span class="var">[2]</span> fetch_3insti.py   抓 TWSE/TPEX 三大法人
+   ├─→ <span class="var">[3]</span> fetch_futures.py  抓期交所外資期貨/選擇權
+   ├─→ <span class="var">[4]</span> fetch_etf.py      抓集保 ETF 受益人
+   ├─→ <span class="var">[5]</span> fetch_macro.py    抓 USDTWD / US10Y
+   │
+   ├─→ <span class="var">[6]</span> market_structure.calc()  → 分數
+   ├─→ <span class="var">[7]</span> for pair in pairs:
+   │       n_shape.calc(A); n_shape.calc(B)
+   │       rr.calc(A, B)
+   │       decision.decide(...)
+   │
+   ├─→ <span class="var">[8]</span> 寫入 Excel (市場結構NRR.xlsx)
+   ├─→ <span class="var">[9]</span> dashboard.py → dashboard.html
+   ├─→ <span class="var">[10]</span> alerts.py    → LINE Notify / Email / Console
+   └─→ <span class="var">[11]</span> git add + commit + push  (若部署 GitHub Pages)
+</div>
+
+<h3>15.2 排程設定（Windows）</h3>
+<div class="formula">
+工作排程器 → 建立基本工作
+名稱：市場結構NRR_每日更新
+觸發程序：每日 <span class="num">18:00</span> (台股收盤後)
+動作：啟動程式
+    程式：C:\Python311\python.exe
+    引數：C:\CludeHome\projects\市場結構NRR\run_daily.py
+    起始位置：C:\CludeHome\projects\市場結構NRR
+</div>
+
+<div class="callout warn">
+  <strong>注意：</strong>三大法人資料約 17:30 後才完整公布，避免 17:00 之前執行。
+</div>
+</section>
+
+<!-- =================================================================== -->
+<section id="sec16">
+<h2>16. 警示條件</h2>
+
+<h3>16.1 市場層警示</h3>
+<div class="tbl-wrap">
+<table>
+  <thead><tr><th>事件</th><th>觸發</th><th>建議</th></tr></thead>
+  <tbody>
+    <tr><td>市場結構翻轉</td><td>MarketStructureScore 由 &gt; +0.3 跌破至 &lt; −0.3</td><td>檢視所有部位，準備降倉</td></tr>
+    <tr><td>外資壓力急升</td><td>ForeignPressureScore 5 日內上升 &gt; 1.5</td><td>留意是否轉空</td></tr>
+    <tr><td>ETF 承接失效</td><td>ETFSupportScore 連續 3 日 &lt; 0</td><td>內資撐盤動能轉弱</td></tr>
+    <tr><td>台幣急貶</td><td>USDTWD 單日升幅 &gt; +0.5%</td><td>外資匯出風險</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>16.2 RR 層警示</h3>
+<div class="tbl-wrap">
+<table>
+  <thead><tr><th>事件</th><th>觸發</th><th>建議</th></tr></thead>
+  <tbody>
+    <tr><td>RR 達極值</td><td>|Z60| 超過動態門檻</td><td>準備換股</td></tr>
+    <tr><td>RR 折返確認</td><td>Z 超門檻後，Ratio 跌破 MA5</td><td>執行第一批換股 (30%)</td></tr>
+    <tr><td>濾網失效</td><td>5 個濾網有 1 個失效</td><td>暫停該組 RR</td></tr>
+    <tr><td>N 形破壞</td><td>跌破回測低點 + 跌破週 MA20</td><td>停損出場</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>16.3 警示輸出管道</h3>
+<ul>
+  <li><strong>Console</strong>：每日跑完 print 一份 summary</li>
+  <li><strong>JSON 檔</strong>：<code>output/signals/2026-05-21.json</code> 機器可讀</li>
+  <li><strong>HTML Dashboard</strong>：顏色標記 + 警示徽章</li>
+  <li><strong>(可選) LINE Notify</strong>：重大警示推播到手機</li>
+  <li><strong>(可選) Email</strong>：每週日寄一份週報</li>
+</ul>
+</section>
+
+<!-- =================================================================== -->
+<section id="sec17">
+<h2>17. 常見錯誤與防呆機制</h2>
+
+<h3>17.1 資料層</h3>
+<div class="tbl-wrap">
+<table>
+  <thead><tr><th>錯誤</th><th>影響</th><th>防呆</th></tr></thead>
+  <tbody>
+    <tr><td>yfinance 抓不到當日資料</td><td>訊號計算空缺</td><td>retry 3 次 + fallback 到前一日</td></tr>
+    <tr><td>三大法人未公布</td><td>市場結構分數錯誤</td><td>檢查資料日期 ≥ 今日，否則中止寫入</td></tr>
+    <tr><td>除權息日未調整</td><td>Ratio 跳動誤判</td><td>用 yfinance 的 <code>auto_adjust=True</code></td></tr>
+    <tr><td>停牌股票</td><td>Z-score 計算扭曲</td><td>檢查連續成交日，少於 N 日剔除</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>17.2 邏輯層</h3>
+<div class="tbl-wrap">
+<table>
+  <thead><tr><th>錯誤</th><th>影響</th><th>防呆</th></tr></thead>
+  <tbody>
+    <tr><td>Look-ahead Bias</td><td>回測虛胖</td><td>所有指標只用 <code>.loc[:date-1]</code></td></tr>
+    <tr><td>用收盤價當訊號又用收盤價成交</td><td>當日無法執行</td><td>訊號用 <code>t-1</code>，成交用 <code>t</code> 開盤</td></tr>
+    <tr><td>Z-score 窗太短</td><td>過度敏感</td><td>固定 60 日，且 require 至少 60 筆資料才出訊號</td></tr>
+    <tr><td>濾網忘記檢查</td><td>逆勢開倉</td><td><code>assert all(filters)</code> 才允許 action</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>17.3 執行層</h3>
+<div class="tbl-wrap">
+<table>
+  <thead><tr><th>錯誤</th><th>防呆</th></tr></thead>
+  <tbody>
+    <tr><td>同一日多次執行造成資料重複</td><td>寫入前檢查日期是否已存在</td></tr>
+    <tr><td>Excel 被使用者打開無法寫入</td><td>try/except + 寫入暫存檔再 rename</td></tr>
+    <tr><td>排程跑失敗無人察覺</td><td>失敗時寫 log + 觸發 LINE 警示</td></tr>
+    <tr><td>主機關機沒跑到</td><td>下次開機檢查上次成功日期，補跑</td></tr>
+  </tbody>
+</table>
+</div>
+</section>
+
+<!-- =================================================================== -->
+<section id="sec18">
+<h2>18. AI Agent 擴充模組（未來）</h2>
+
+<div class="callout">
+  目前框架是<strong>規則引擎 (rule-based)</strong>。所有決策可解釋、可回測、可信任。<br>
+  AI Agent 擴充是<strong>輔助層</strong>，不取代規則，只補充規則無法處理的非結構化資訊。
+</div>
+
+<h3>18.1 可擴充方向</h3>
+<div class="tbl-wrap">
+<table>
+  <thead><tr><th>模組</th><th>用途</th><th>實作</th></tr></thead>
+  <tbody>
+    <tr><td>新聞情緒分析</td><td>抓取個股新聞，判斷正/負面</td><td>Claude API + RSS / 鉅亨網爬蟲</td></tr>
+    <tr><td>法說會摘要</td><td>解析法說會逐字稿，抽取財務指引</td><td>Claude API + PDF 解析</td></tr>
+    <tr><td>產業趨勢追蹤</td><td>追蹤海外重要報告 (SemiAnalysis 等)</td><td>Web search + Claude 摘要</td></tr>
+    <tr><td>異常檢測</td><td>找出 Z60 異常但規則沒抓到的情境</td><td>Isolation Forest / LLM 解釋</td></tr>
+    <tr><td>策略對話介面</td><td>用自然語言詢問「今天為什麼建議降倉？」</td><td>Claude API + 訊號 JSON 為 context</td></tr>
+    <tr><td>每週週報自動生成</td><td>用本週訊號 + 走勢自動寫一份報告</td><td>Claude API + Jinja 模板 → HTML</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>18.2 設計原則</h3>
+<ul>
+  <li><strong>AI 不下決策</strong>：AI 只提供 context 與摘要，最終決策仍由規則引擎產出</li>
+  <li><strong>AI 輸出要可審計</strong>：每次 AI 呼叫的輸入輸出存檔，可回溯</li>
+  <li><strong>AI 失效時系統仍能運作</strong>：規則引擎獨立運作，AI 只是加值</li>
+</ul>
+</section>
+
+<!-- =================================================================== -->
+<section id="sec19">
+<h2>19. 開發路線圖</h2>
+
+<h3>Phase 1 ｜ 資料管道 (1~2 週)</h3>
+<ul>
+  <li>建 <code>data/</code> 目錄結構</li>
+  <li>寫好 5 個 fetcher (price / 3insti / etf / macro / futures)</li>
+  <li>驗證資料完整性與更新時間</li>
+  <li>建 <code>config/pairs.yaml</code> 與 <code>params.yaml</code></li>
+</ul>
+
+<h3>Phase 2 ｜ 指標模組 (1~2 週)</h3>
+<ul>
+  <li><code>market_structure.py</code>：分數計算 + 環境判讀</li>
+  <li><code>n_shape.py</code>：月/週/日 N 形狀態</li>
+  <li><code>rr.py</code>：Ratio / Z60 / MA / 狀態</li>
+  <li>單元測試每個指標的邊界情況</li>
+</ul>
+
+<h3>Phase 3 ｜ 決策引擎與回測 (2~3 週)</h3>
+<ul>
+  <li><code>decision.py</code>：整合三層輸出 action</li>
+  <li><code>backtest.py</code>：4 種策略對照回測</li>
+  <li>產出回測報告 (HTML)</li>
+  <li>調參：動態門檻、分批比例</li>
+</ul>
+
+<h3>Phase 4 ｜ Dashboard 與自動化 (1~2 週)</h3>
+<ul>
+  <li><code>dashboard.py</code>：每日 HTML 儀表板</li>
+  <li><code>alerts.py</code>：警示與 LINE Notify</li>
+  <li>Windows 排程器 + log 機制</li>
+  <li>GitHub Pages 部署</li>
+</ul>
+
+<h3>Phase 5 ｜ AI Agent 加值 (可選，未來)</h3>
+<ul>
+  <li>新聞情緒分析模組</li>
+  <li>每週週報自動生成</li>
+  <li>對話式策略諮詢</li>
+</ul>
+
+<div class="callout good">
+  <strong>Phase 1 → Phase 4 為核心 MVP，預估 5~8 週。</strong> <br>
+  完成後就有一套可每日自動跑、可回測、可推播的完整系統。<br>
+  Phase 5 為 AI 加值，視需求加入。
+</div>
+</section>
+
+<footer>
+  <p><strong>市場結構 + N-RR 台股交易系統</strong> ｜ 框架設計文件 v1.0</p>
+  <p>日期：2026-05-21 ｜ 作者：小明 × Claude (Opus 4.7)</p>
+  <p>資料來源規劃：</p>
+  <ul>
+    <li>股價：<a href="https://finance.yahoo.com" target="_blank">Yahoo Finance (yfinance)</a></li>
+    <li>三大法人：<a href="https://www.twse.com.tw/" target="_blank">TWSE</a> / <a href="https://www.tpex.org.tw/" target="_blank">TPEX</a></li>
+    <li>外資期貨/選擇權：<a href="https://www.taifex.com.tw/" target="_blank">台灣期貨交易所</a></li>
+    <li>ETF 受益人：<a href="https://www.tdcc.com.tw/" target="_blank">集保結算所</a></li>
+    <li>匯率：<a href="https://www.cbc.gov.tw/" target="_blank">中央銀行</a> / yfinance</li>
+    <li>海外指標：SOX / NDX / VIX / US10Y / TSM ADR via yfinance</li>
+  </ul>
+</footer>
+
+</main>
+</div>
+
+<script>
+  // Progress bar
+  const bar = document.querySelector('#progress > div');
+  window.addEventListener('scroll', () => {
+    const h = document.documentElement;
+    const pct = (h.scrollTop) / (h.scrollHeight - h.clientHeight) * 100;
+    bar.style.width = pct + '%';
+  });
+
+  // TOC active highlight
+  const sections = document.querySelectorAll('section');
+  const links = document.querySelectorAll('aside.toc a');
+  const obs = new IntersectionObserver((entries) => {
+    entries.forEach(en => {
+      if (en.isIntersecting) {
+        const id = en.target.id;
+        links.forEach(a => a.classList.toggle('active', a.getAttribute('href') === '#' + id));
+      }
+    });
+  }, { rootMargin: '-30% 0px -60% 0px' });
+  sections.forEach(s => obs.observe(s));
+</script>
+</body>
+</html>

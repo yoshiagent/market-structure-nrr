@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>市場結構 + N-RR 訊號儀表板 ｜ 2026-05-21</title>
+<style>
+  :root {
+    --bg:#0d1117; --card:#131f2e; --card2:#0f1a28;
+    --text:#e2e8f0; --muted:#94a3b8; --border:#2d3f55;
+    --blue:#3b82f6; --blue-light:#60a5fa; --blue-soft:#93c5fd;
+    --orange:#fb923c; --green:#4ade80; --red:#f87171; --yellow:#facc15;
+  }
+  * { box-sizing: border-box; }
+  html { overflow-x: hidden; }
+  body {
+    margin:0; padding:0;
+    width:100vw; max-width:100vw; overflow-x:hidden;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft JhengHei", "PingFang TC", sans-serif;
+    background: var(--bg); color: var(--text);
+    line-height: 1.6; font-size: 14px;
+  }
+
+  /* Top nav */
+  #nav {
+    position: sticky; top:0; z-index:1000;
+    background:#1e293b; border-bottom:1px solid var(--border);
+    padding: 10px 18px;
+    display:flex; align-items:center; justify-content:space-between;
+    flex-wrap:wrap; gap:8px;
+  }
+  #nav .title { font-size:16px; font-weight:600; color:#fff }
+  #nav .sub   { font-size:12px; color:var(--muted); margin-left:8px }
+  #nav .meta  { font-size:12px; color:var(--muted) }
+
+  main { padding: 20px 18px; max-width: 1400px; margin: 0 auto; }
+
+  section { margin-bottom: 28px; }
+  h2 {
+    font-size: 17px; margin: 0 0 12px;
+    padding-bottom: 6px; border-bottom: 1px solid var(--border);
+    color: #fff;
+  }
+
+  /* ---- Market card ---- */
+  .market-card {
+    background: linear-gradient(135deg, var(--card), var(--card2));
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 22px;
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    gap: 24px;
+    align-items: center;
+  }
+  .score-big .lbl { font-size:11px; color:var(--muted); letter-spacing:0.05em; text-transform:uppercase }
+  .score-big .val { font-size:36px; font-weight:700; line-height:1.2; margin:4px 0 6px }
+  .score-big .reg { font-size:13px }
+  .score-sub { display:flex; flex-direction:column; gap:8px; }
+  .ssrow { display:grid; grid-template-columns: repeat(3, 1fr); gap:8px 16px; font-size:12px; }
+  .ssrow .t { color:var(--muted); display:block; font-size:11px }
+  .ssrow .v { font-weight:600; font-size:14px; color:#fff; font-family:"Consolas",monospace }
+
+  /* ---- Chart container ---- */
+  .chart-wrap {
+    background: var(--card2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px;
+    margin-top: 12px;
+  }
+
+  /* ---- Tables ---- */
+  .tbl-wrap {
+    overflow-x: auto;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+  table { width:100%; border-collapse:collapse; font-size:13px }
+  th {
+    background:#0e1a2a; color:var(--blue-soft);
+    padding: 8px 10px; text-align:left;
+    border-bottom: 1px solid var(--border);
+    white-space:nowrap; font-weight:600;
+    position:sticky; top:0;
+  }
+  td {
+    padding: 8px 10px;
+    border-bottom: 1px solid #1e2a3a;
+    vertical-align: middle;
+  }
+  tr:hover td { background: rgba(59,130,246,0.05) }
+  td.num { font-family:"Consolas",monospace; text-align:right; }
+  td.pair-name { min-width:120px }
+  .small { font-size:11px; color:var(--muted) }
+
+  /* ---- Pill ---- */
+  .pill {
+    display:inline-block; padding:2px 9px; border-radius:999px;
+    font-size:11.5px; font-weight:600; white-space:nowrap;
+  }
+  .pill.bull { background:#0f2a18; color:#4ade80; border:1px solid #166534 }
+  .pill.bear { background:#2a0f0f; color:#f87171; border:1px solid #991b1b }
+  .pill.neu  { background:#1f2937; color:#94a3b8; border:1px solid var(--border) }
+  .pill.warn { background:#2a1810; color:#fb923c; border:1px solid #9a3412 }
+
+  /* ---- Icon ---- */
+  .ic {
+    display:inline-block; width:18px; height:18px;
+    border-radius:50%; text-align:center; line-height:18px;
+    font-size:12px; font-weight:700;
+  }
+  .ic.ok { background:rgba(74,222,128,0.15); color:#4ade80 }
+  .ic.no { background:rgba(248,113,113,0.15); color:#f87171 }
+  .ic.na { background:rgba(148,163,184,0.15); color:#94a3b8 }
+
+  /* ---- Mobile ---- */
+  @media (max-width: 768px) {
+    .market-card { grid-template-columns: 1fr; }
+    .ssrow { grid-template-columns: repeat(2, 1fr); }
+    h2 { font-size: 16px; }
+    body { font-size: 13px; }
+    th, td { padding: 6px 8px; }
+  }
+
+  footer {
+    margin-top: 40px; padding: 16px 0;
+    border-top: 1px solid var(--border);
+    color: var(--muted); font-size: 12px; text-align: center;
+  }
+</style>
+</head>
+<body>
+
+<div id="nav">
+  <div>
+    <span class="title">市場結構 + N-RR 訊號</span>
+    <span class="sub">更新：2026-05-21</span>
+  </div>
+  <div class="meta">多空拉鋸　｜　MarketScore = <strong style="color:#fb923c">+0.080</strong></div>
+</div>
+
+<main>
+
+  <section id="market">
+    <h2>市場結構</h2>
+    
+    <div class="market-card">
+      <div class="score-big" style="color:#fb923c">
+        <div class="lbl">MarketStructureScore</div>
+        <div class="val">+0.080</div>
+        <div class="reg"><span class="pill neu">多空拉鋸</span></div>
+      </div>
+      <div class="score-sub">
+        <div class="ssrow">
+          <div><span class="t">ForeignPressure</span><span class="v" style="color:#f87171">-0.559</span></div>
+          <div><span class="t">ETFSupport</span><span class="v" style="color:#4ade80">-0.479</span></div>
+          <div><span class="t">動態 Z 門檻</span><span class="v">±2.00</span></div>
+        </div>
+        <div class="ssrow">
+          <div><span class="t">外資現貨</span><span class="v" style="color:#4ade80">+593.0 億</span></div>
+          <div><span class="t">投信</span><span class="v" style="color:#4ade80">+30.1 億</span></div>
+          <div><span class="t">外資期貨淨</span><span class="v" style="color:#f87171">-44454 口</span></div>
+        </div>
+        <div class="ssrow">
+          <div><span class="t">PCR_net</span><span class="v">1.661</span></div>
+          <div><span class="t">USD/TWD</span><span class="v">31.551</span></div>
+          <div><span class="t">TAIEX</span><span class="v">41368</span></div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="chart-wrap"><div>                        <script>window.PlotlyConfig = {MathJaxConfig: 'local'};</script>
+        <script charset="utf-8" src="https://cdn.plot.ly/plotly-3.5.0.min.js" integrity="sha256-fHbNLP+GlIXN+efbQec78UkemUz3NJp7UmfGxC1tNxs=" crossorigin="anonymous"></script>                <div id="8030a3fd-3127-4637-8b87-0d44130dc48e" class="plotly-graph-div" style="height:320px; width:100%;"></div>            <script>                window.PLOTLYENV=window.PLOTLYENV || {};                                if (document.getElementById("8030a3fd-3127-4637-8b87-0d44130dc48e")) {                    Plotly.newPlot(                        "8030a3fd-3127-4637-8b87-0d44130dc48e",                        [{"hovertemplate":"%{x}\u003cbr\u003eScore: \u003cb\u003e%{y:.3f}\u003c\u002fb\u003e\u003cextra\u003e\u003c\u002fextra\u003e","line":{"color":"#60a5fa","width":2},"marker":{"size":4},"mode":"lines+markers","name":"MarketStructureScore","x":["2026-02-23","2026-02-24","2026-02-25","2026-02-26","2026-03-02","2026-03-03","2026-03-04","2026-03-05","2026-03-06","2026-03-09","2026-03-10","2026-03-11","2026-03-12","2026-03-13","2026-03-16","2026-03-17","2026-03-18","2026-03-19","2026-03-20","2026-03-23","2026-03-24","2026-03-25","2026-03-26","2026-03-27","2026-03-30","2026-03-31","2026-04-01","2026-04-02","2026-04-07","2026-04-08","2026-04-09","2026-04-10","2026-04-13","2026-04-14","2026-04-15","2026-04-16","2026-04-17","2026-04-20","2026-04-21","2026-04-22","2026-04-23","2026-04-24","2026-04-27","2026-04-28","2026-04-29","2026-04-30","2026-05-04","2026-05-05","2026-05-06","2026-05-07","2026-05-08","2026-05-11","2026-05-12","2026-05-13","2026-05-14","2026-05-15","2026-05-18","2026-05-19","2026-05-20","2026-05-21"],"y":{"dtype":"f8","bdata":"EuaRAt8Nyj9eWvBkswHkP7DIM+8Cv9w\u002fyZxRxSxH7b92zlxAhezqvzEllzpES+a\u002fhstGwRMfxj+4J8R9gq\u002fVv0S+QIJ8s\u002fO\u002f9h2++VOx9D9Kl0vHvi+6P\u002ftN8Jl\u002fE92\u002fNSYaRbhe+b+K8OZTOQDwv78PanXO3eW\u002fgvjK2UCdrr9eYfN\u002fgezJv01yfg0HSe+\u002fZe3N2jao2b9HY0yyjHrXP8WgSUPuA90\u002fQwCJgjBaoj8vpflrfpLcv8rztI6nJe+\u002fiVHmb4VK4L9\u002fCe9tt2niP40WcTN3m+k\u002fD5fyoJV04T\u002fhc48Ad9TbPz4hYA26\u002fPQ\u002fjpmUVwlb3j\u002f7qbsX8i7WvyKNGbh6gqa\u002fGZg4eQiS0D\u002f9QLW4I\u002faXP8q3sqq8brI\u002fSYRsOAcE2790Qs1Ayxmov\u002feyfN2O0uc\u002fGJPhgVYfwT9bQdQmcH7Yv4S76ILxr6o\u002fO\u002fYi7GKpsz\u002fbJD0rMBTxv8LVLD2bMOq\u002fCtJzSvCy6b9wDC8YXUzFP8heF0AvQcG\u002fynMG5pfQ5j8T60vVEzrgP7IvORTfqda\u002fQNgwAzuboj9nSFgqGN7dPxd0k\u002fC0y7O\u002fljV5giMY37\u002f4zPwp78rxv\u002fzgHzUGGL2\u002fAYCU+2Me2r+A0ZaYHkbavxyhBgmoebQ\u002f"},"type":"scatter"},{"hovertemplate":"ETF: %{y:.3f}\u003cextra\u003e\u003c\u002fextra\u003e","line":{"color":"#4ade80","dash":"dot","width":1.2},"mode":"lines","name":"ETF Support","x":["2026-02-23","2026-02-24","2026-02-25","2026-02-26","2026-03-02","2026-03-03","2026-03-04","2026-03-05","2026-03-06","2026-03-09","2026-03-10","2026-03-11","2026-03-12","2026-03-13","2026-03-16","2026-03-17","2026-03-18","2026-03-19","2026-03-20","2026-03-23","2026-03-24","2026-03-25","2026-03-26","2026-03-27","2026-03-30","2026-03-31","2026-04-01","2026-04-02","2026-04-07","2026-04-08","2026-04-09","2026-04-10","2026-04-13","2026-04-14","2026-04-15","2026-04-16","2026-04-17","2026-04-20","2026-04-21","2026-04-22","2026-04-23","2026-04-24","2026-04-27","2026-04-28","2026-04-29","2026-04-30","2026-05-04","2026-05-05","2026-05-06","2026-05-07","2026-05-08","2026-05-11","2026-05-12","2026-05-13","2026-05-14","2026-05-15","2026-05-18","2026-05-19","2026-05-20","2026-05-21"],"y":{"dtype":"f8","bdata":"vLUZ8Eunxj99mk5SDDLRP2LfzA8Sq9w\u002fV9MEpZMNuL\u002fi4TOX\u002flLkP3euVYrl+ek\u002fPEY7GEY6AEAOnv\u002fOKIvlPwjxk+2vm9k\u002fRK9iF15uAkAD1mQaM4fgP\u002fGL8ARwitq\u002fkKDtJVVrsL9+gLhLTcljP+\u002fiBqtYrc8\u002fgh7N7XzyzL9HW6dQnPXRv0pqLfoV\u002fdA\u002fmNleW8Qxsb\u002fciOq3yoL3PxVwqSf+N8k\u002f8kXw1zUryr+3HDSRVk\u002fLP\u002fyELn1OhtC\u002ff6QwtMXD4z\u002fXze6SClbtPz2aKiMXAbs\u002fgDg09ECV7j8ELxEeM\u002fWzP8q9Zl6D9b2\u002fCgMOinjWyb8Yu9kF61Plv6pcqbabV8Q\u002fnnMvZmsR2b8k8j30eTHZv\u002fR6lpQo8Lk\u002fOBjhCD7o0r8OSJ+8AOnIP6ybCjHCveQ\u002fd3m2CA5d2D929vSBU2evvwMa8eym4MS\u002fWAHW8a7S5z8KJHmeRRWtP8BdyKWnE5+\u002fvw3GvW+Lkr+VPvmraaPFP4RyLmASksg\u002fVt8uaPD94D8Oj8j374LrP8fwV26tGqQ\u002f68PQR+6B2T8EkelEJhT6P1PkwNqYHus\u002f7VaZyIg3tT\u002fXk9vsMMHPv5pe3ik0a90\u002fze7dNi4Vyz88x1hKLOyzvxYYMM1Jq96\u002f"},"type":"scatter"},{"hovertemplate":"Foreign: %{y:.3f}\u003cextra\u003e\u003c\u002fextra\u003e","line":{"color":"#f87171","dash":"dot","width":1.2},"mode":"lines","name":"Foreign Pressure","x":["2026-02-23","2026-02-24","2026-02-25","2026-02-26","2026-03-02","2026-03-03","2026-03-04","2026-03-05","2026-03-06","2026-03-09","2026-03-10","2026-03-11","2026-03-12","2026-03-13","2026-03-16","2026-03-17","2026-03-18","2026-03-19","2026-03-20","2026-03-23","2026-03-24","2026-03-25","2026-03-26","2026-03-27","2026-03-30","2026-03-31","2026-04-01","2026-04-02","2026-04-07","2026-04-08","2026-04-09","2026-04-10","2026-04-13","2026-04-14","2026-04-15","2026-04-16","2026-04-17","2026-04-20","2026-04-21","2026-04-22","2026-04-23","2026-04-24","2026-04-27","2026-04-28","2026-04-29","2026-04-30","2026-05-04","2026-05-05","2026-05-06","2026-05-07","2026-05-08","2026-05-11","2026-05-12","2026-05-13","2026-05-14","2026-05-15","2026-05-18","2026-05-19","2026-05-20","2026-05-21"],"y":{"dtype":"f8","bdata":"kILBk5g0m789GpJ3WtHWv8tN6Wbf8FO\u002fXQKxUHpF6j8sWMjrwZ\u002f3P9RpduKUIvg\u002fB7NNuKmw\u002fT\u002f12PAGdTHwP4a6pX1oGvo\u002fk0AHNWgr8D8yxvaCdoLaP00Q\u002fqd8SKQ\u002fLEy78gJY+D\u002fKzIz6HQrwP3vIK6Akye0\u002fXmBatyxLxb9ZqrZCbv2zv7mTSgXJ4\u002fM\u002f\u002fTb2w8Vb1T8KcFeLJ6TxP7nodC\u002fvZ9C\u002fBoaS+MHBzr\u002fG2UnaFB3lP0yxHVCA4uY\u002fBHsLkiUH8j+tiP9JptjVP0XDC09UO+a\u002f4kKDplZB2j8gKAs5KtfWvxqNRkMS3Pa\u002fis1NziKj5b8zzPfz43jUv\u002fa\u002fr2Q6+Mk\u002f3AW077nR5L8zRskv3LDav6kMj6evBZ4\u002fItgWX5I3wD+umNKMc+\u002fOP1G6kGNlpri\u002f01+Lj8Wazz+LopW2hZHUP+dIq02jjMu\u002fkKJRlIJd5T\u002f87TBY2vzxP9SS\u002fv\u002f9N+k\u002fm6GFzJQe6T89iYzyJMNlP6joItCg6dQ\u002fzlFe951Kx7\u002f2R\u002flEuJHWP8otBMI0Ldk\u002f4ahq54Yu1z\u002fqflM6oJzyP9ZS03gPmO0\u002fqcVP2gIz4j\u002f6tMIYkqXrP20rk9uaWOI\u002ftLuBi33U4z+unwCGE0vVPy\u002fguOfZ5OG\u002f"},"type":"scatter"}],                        {"template":{"data":{"histogram2dcontour":[{"type":"histogram2dcontour","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"choropleth":[{"type":"choropleth","colorbar":{"outlinewidth":0,"ticks":""}}],"histogram2d":[{"type":"histogram2d","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"heatmap":[{"type":"heatmap","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"contourcarpet":[{"type":"contourcarpet","colorbar":{"outlinewidth":0,"ticks":""}}],"contour":[{"type":"contour","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"surface":[{"type":"surface","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"mesh3d":[{"type":"mesh3d","colorbar":{"outlinewidth":0,"ticks":""}}],"scatter":[{"fillpattern":{"fillmode":"overlay","size":10,"solidity":0.2},"type":"scatter"}],"parcoords":[{"type":"parcoords","line":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterpolargl":[{"type":"scatterpolargl","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"bar":[{"error_x":{"color":"#2a3f5f"},"error_y":{"color":"#2a3f5f"},"marker":{"line":{"color":"#E5ECF6","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"bar"}],"scattergeo":[{"type":"scattergeo","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterpolar":[{"type":"scatterpolar","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"histogram":[{"marker":{"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"histogram"}],"scattergl":[{"type":"scattergl","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatter3d":[{"type":"scatter3d","line":{"colorbar":{"outlinewidth":0,"ticks":""}},"marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattermap":[{"type":"scattermap","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattermapbox":[{"type":"scattermapbox","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterternary":[{"type":"scatterternary","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattercarpet":[{"type":"scattercarpet","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"carpet":[{"aaxis":{"endlinecolor":"#2a3f5f","gridcolor":"white","linecolor":"white","minorgridcolor":"white","startlinecolor":"#2a3f5f"},"baxis":{"endlinecolor":"#2a3f5f","gridcolor":"white","linecolor":"white","minorgridcolor":"white","startlinecolor":"#2a3f5f"},"type":"carpet"}],"table":[{"cells":{"fill":{"color":"#EBF0F8"},"line":{"color":"white"}},"header":{"fill":{"color":"#C8D4E3"},"line":{"color":"white"}},"type":"table"}],"barpolar":[{"marker":{"line":{"color":"#E5ECF6","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"barpolar"}],"pie":[{"automargin":true,"type":"pie"}]},"layout":{"autotypenumbers":"strict","colorway":["#636efa","#EF553B","#00cc96","#ab63fa","#FFA15A","#19d3f3","#FF6692","#B6E880","#FF97FF","#FECB52"],"font":{"color":"#2a3f5f"},"hovermode":"closest","hoverlabel":{"align":"left"},"paper_bgcolor":"white","plot_bgcolor":"#E5ECF6","polar":{"bgcolor":"#E5ECF6","angularaxis":{"gridcolor":"white","linecolor":"white","ticks":""},"radialaxis":{"gridcolor":"white","linecolor":"white","ticks":""}},"ternary":{"bgcolor":"#E5ECF6","aaxis":{"gridcolor":"white","linecolor":"white","ticks":""},"baxis":{"gridcolor":"white","linecolor":"white","ticks":""},"caxis":{"gridcolor":"white","linecolor":"white","ticks":""}},"coloraxis":{"colorbar":{"outlinewidth":0,"ticks":""}},"colorscale":{"sequential":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"sequentialminus":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"diverging":[[0,"#8e0152"],[0.1,"#c51b7d"],[0.2,"#de77ae"],[0.3,"#f1b6da"],[0.4,"#fde0ef"],[0.5,"#f7f7f7"],[0.6,"#e6f5d0"],[0.7,"#b8e186"],[0.8,"#7fbc41"],[0.9,"#4d9221"],[1,"#276419"]]},"xaxis":{"gridcolor":"white","linecolor":"white","ticks":"","title":{"standoff":15},"zerolinecolor":"white","automargin":true,"zerolinewidth":2},"yaxis":{"gridcolor":"white","linecolor":"white","ticks":"","title":{"standoff":15},"zerolinecolor":"white","automargin":true,"zerolinewidth":2},"scene":{"xaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2},"yaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2},"zaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2}},"shapedefaults":{"line":{"color":"#2a3f5f"}},"annotationdefaults":{"arrowcolor":"#2a3f5f","arrowhead":0,"arrowwidth":1},"geo":{"bgcolor":"white","landcolor":"#E5ECF6","subunitcolor":"white","showland":true,"showlakes":true,"lakecolor":"white"},"title":{"x":0.05},"mapbox":{"style":"light"}}},"shapes":[{"line":{"color":"#475569","dash":"dash","width":0.6},"type":"line","x0":0,"x1":1,"xref":"x domain","y0":0,"y1":0,"yref":"y"},{"line":{"color":"#22c55e","dash":"dash","width":0.6},"type":"line","x0":0,"x1":1,"xref":"x domain","y0":1.0,"y1":1.0,"yref":"y"},{"line":{"color":"#84cc16","dash":"dash","width":0.6},"type":"line","x0":0,"x1":1,"xref":"x domain","y0":0.3,"y1":0.3,"yref":"y"},{"line":{"color":"#f59e0b","dash":"dash","width":0.6},"type":"line","x0":0,"x1":1,"xref":"x domain","y0":-0.3,"y1":-0.3,"yref":"y"},{"line":{"color":"#ef4444","dash":"dash","width":0.6},"type":"line","x0":0,"x1":1,"xref":"x domain","y0":-1.0,"y1":-1.0,"yref":"y"}],"margin":{"l":50,"r":20,"t":20,"b":40},"font":{"family":"-apple-system, sans-serif","color":"#e2e8f0","size":11},"legend":{"orientation":"h","yanchor":"bottom","y":1.02,"xanchor":"right","x":1,"bgcolor":"rgba(0,0,0,0)"},"xaxis":{"showgrid":false,"color":"#94a3b8","tickangle":-45,"nticks":10},"yaxis":{"showgrid":true,"gridcolor":"#1e293b","color":"#94a3b8","zeroline":false},"height":320,"paper_bgcolor":"#0d1117","plot_bgcolor":"#0e1525","showlegend":true,"hovermode":"x unified"},                        {"displayModeBar": false, "scrollZoom": false, "doubleClick": false, "responsive": true}                    )                };            </script>        </div></div>
+  </section>
+
+  <section id="rr">
+    <h2>RR 配對訊號（11 組）</h2>
+    
+    <div class="tbl-wrap">
+    <table class="rr-table">
+      <thead><tr>
+        <th>配對</th><th>A</th><th>B</th><th>Z60</th><th>門檻</th>
+        <th>A_N</th><th>B_N</th>
+        <th title="兩檔週MA20皆向上">週MA↑</th>
+        <th title="兩檔N形未破">N有效</th>
+        <th title="MarketScore > -1">市場OK</th>
+        <th title="所有濾網全過">全過</th>
+        <th>動作</th>
+      </tr></thead>
+      <tbody>
+        <tr>
+          <td class="pair-name"><strong>南電欣興</strong><br><span class="small">ABF載板</span></td>
+          <td>南電(8046)</td>
+          <td>欣興(3037)</td>
+          <td class="num" style="color:#60a5fa; font-weight:600">-1.66</td>
+          <td class="num">±2.00</td>
+          <td><span class="pill warn">回測中</span></td>
+          <td><span class="pill warn">回測中</span></td>
+          <td><span class="ic ok">✓</span></td>
+          <td><span class="ic ok">✓</span></td>
+          <td><span class="ic ok">✓</span></td>
+          <td><span class="ic ok">✓</span></td>
+          <td><span class="pill bull">持有</span></td>
+        </tr>
+        
+        <tr>
+          <td class="pair-name"><strong>光寶台達電</strong><br><span class="small">電源_AI伺服器</span></td>
+          <td>光寶科(2301)</td>
+          <td>台達電(2308)</td>
+          <td class="num" style="color:#60a5fa; font-weight:600">-0.06</td>
+          <td class="num">±2.00</td>
+          <td><span class="pill neu">未成立</span></td>
+          <td><span class="pill warn">回測中</span></td>
+          <td><span class="ic ok">✓</span></td>
+          <td><span class="ic no">✗</span></td>
+          <td><span class="ic ok">✓</span></td>
+          <td><span class="ic no">✗</span></td>
+          <td><span class="pill neu">濾網未過</span></td>
+        </tr>
+        
+        <tr>
+          <td class="pair-name"><strong>巨大美利達</strong><br><span class="small">自行車</span></td>
+          <td>巨大(9921)</td>
+          <td>美利達(9914)</td>
+          <td class="num" style="color:#60a5fa; font-weight:600">-1.85</td>
+          <td class="num">±2.00</td>
+          <td><span class="pill neu">未成立</span></td>
+          <td><span class="pill neu">未成立</span></td>
+          <td><span class="ic no">✗</span></td>
+          <td><span class="ic no">✗</span></td>
+          <td><span class="ic ok">✓</span></td>
+          <td><span class="ic no">✗</span></td>
+          <td><span class="pill neu">濾網未過</span></td>
+        </tr>
+        
+        <tr>
+          <td class="pair-name"><strong>奇鋐雙鴻</strong><br><span class="small">散熱_AI</span></td>
+          <td>奇鋐(3017)</td>
+          <td>雙鴻(3324)</td>
+          <td class="num" style="color:#4ade80; font-weight:600">+1.12</td>
+          <td class="num">±2.00</td>
+          <td><span class="pill warn">回測中</span></td>
+          <td><span class="pill bear">失敗</span></td>
+          <td><span class="ic no">✗</span></td>
+          <td><span class="ic no">✗</span></td>
+          <td><span class="ic ok">✓</span></td>
+          <td><span class="ic no">✗</span></td>
+          <td><span class="pill neu">濾網未過</span></td>
+        </tr>
+        
+        <tr>
+          <td class="pair-name"><strong>廣達緯創</strong><br><span class="small">AI伺服器代工</span></td>
+          <td>廣達(2382)</td>
+          <td>緯創(3231)</td>
+          <td class="num" style="color:#60a5fa; font-weight:600">-0.89</td>
+          <td class="num">±2.00</td>
+          <td><span class="pill neu">未成立</span></td>
+          <td><span class="pill neu">未成立</span></td>
+          <td><span class="ic no">✗</span></td>
+          <td><span class="ic no">✗</span></td>
+          <td><span class="ic ok">✓</span></td>
+          <td><span class="ic no">✗</span></td>
+          <td><span class="pill neu">濾網未過</span></td>
+        </tr>
+        
+        <tr>
+          <td class="pair-name"><strong>台光電聯茂</strong><br><span class="small">CCL_銅箔基板</span></td>
+          <td>台光電(2383)</td>
+          <td>聯茂(6213)</td>
+          <td class="num" style="color:#4ade80; font-weight:600">+0.97</td>
+          <td class="num">±2.00</td>
+          <td><span class="pill warn">回測中</span></td>
+          <td><span class="pill bull">第一波</span></td>
+          <td><span class="ic ok">✓</span></td>
+          <td><span class="ic ok">✓</span></td>
+          <td><span class="ic ok">✓</span></td>
+          <td><span class="ic ok">✓</span></td>
+          <td><span class="pill bull">持有</span></td>
+        </tr>
+        
+        <tr>
+          <td class="pair-name"><strong>南亞科華邦</strong><br><span class="small">記憶體</span></td>
+          <td>南亞科(2408)</td>
+          <td>華邦電(2344)</td>
+          <td class="num" style="color:#4ade80; font-weight:600">+1.54</td>
+          <td class="num">±2.00</td>
+          <td><span class="pill neu">未成立</span></td>
+          <td><span class="pill neu">未成立</span></td>
+          <td><span class="ic ok">✓</span></td>
+          <td><span class="ic no">✗</span></td>
+          <td><span class="ic ok">✓</span></td>
+          <td><span class="ic no">✗</span></td>
+          <td><span class="pill neu">濾網未過</span></td>
+        </tr>
+        
+        <tr>
+          <td class="pair-name"><strong>上銀大銀</strong><br><span class="small">滾珠螺桿_自動化</span></td>
+          <td>上銀(2049)</td>
+          <td>大銀微系統(4576)</td>
+          <td class="num" style="color:#60a5fa; font-weight:600">-0.76</td>
+          <td class="num">±2.00</td>
+          <td><span class="pill bull">第一波</span></td>
+          <td><span class="pill bull">第一波</span></td>
+          <td><span class="ic ok">✓</span></td>
+          <td><span class="ic ok">✓</span></td>
+          <td><span class="ic ok">✓</span></td>
+          <td><span class="ic ok">✓</span></td>
+          <td><span class="pill bull">持有</span></td>
+        </tr>
+        
+        <tr>
+          <td class="pair-name"><strong>金像電燿華</strong><br><span class="small">PCB_伺服器板</span></td>
+          <td>金像電(2368)</td>
+          <td>燿華(2367)</td>
+          <td class="num" style="color:#4ade80; font-weight:600">+0.80</td>
+          <td class="num">±2.00</td>
+          <td><span class="pill warn">回測中</span></td>
+          <td><span class="pill neu">未成立</span></td>
+          <td><span class="ic ok">✓</span></td>
+          <td><span class="ic no">✗</span></td>
+          <td><span class="ic ok">✓</span></td>
+          <td><span class="ic no">✗</span></td>
+          <td><span class="pill neu">濾網未過</span></td>
+        </tr>
+        
+        <tr>
+          <td class="pair-name"><strong>所羅華晶</strong><br><span class="small">影像感測</span></td>
+          <td>所羅(2359)</td>
+          <td>華晶科(3059)</td>
+          <td class="num" style="color:#4ade80; font-weight:600">+0.13</td>
+          <td class="num">±2.00</td>
+          <td><span class="pill neu">未成立</span></td>
+          <td><span class="pill neu">未成立</span></td>
+          <td><span class="ic ok">✓</span></td>
+          <td><span class="ic no">✗</span></td>
+          <td><span class="ic ok">✓</span></td>
+          <td><span class="ic no">✗</span></td>
+          <td><span class="pill neu">濾網未過</span></td>
+        </tr>
+        
+        <tr>
+          <td class="pair-name"><strong>廣達達明</strong><br><span class="small">機器人_AI</span></td>
+          <td>廣達(2382)</td>
+          <td>達明(4585)</td>
+          <td class="num" style="color:#60a5fa; font-weight:600">-0.74</td>
+          <td class="num">±2.00</td>
+          <td><span class="pill neu">未成立</span></td>
+          <td><span class="pill neu">未成立</span></td>
+          <td><span class="ic ok">✓</span></td>
+          <td><span class="ic no">✗</span></td>
+          <td><span class="ic ok">✓</span></td>
+          <td><span class="ic no">✗</span></td>
+          <td><span class="pill neu">濾網未過</span></td>
+        </tr>
+        </tbody>
+    </table>
+    </div>
+    
+  </section>
+
+  <section id="nshape">
+    <h2>N 形狀態（21 檔個股）</h2>
+    
+    <div class="tbl-wrap">
+    <table class="n-table">
+      <thead><tr>
+        <th>個股</th><th>收盤</th><th>MA20</th><th>vs MA20</th><th>週MA20</th>
+        <th title="月線過關">月線</th>
+        <th title="週線過關">週線</th>
+        <th title="週MA20向上">週MA↑</th>
+        <th>N 形</th>
+      </tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>南電</strong>　<span class="small">8046</span></td>
+          <td class="num">872.0</td>
+          <td class="num">888.5</td>
+          <td class="num" style="color:#f87171">-1.9%</td>
+          <td class="num">550.11</td>
+          <td><span class="ic ok">✓</span></td>
+          <td><span class="ic ok">✓</span></td>
+          <td><span class="ic ok">✓</span></td>
+          <td><span class="pill warn">回測中</span></td>
+        </tr>
+        
+        <tr>
+          <td><strong>欣興</strong>　<span class="small">3037</span></td>
+          <td class="num">905.0</td>
+          <td class="num">847.3</td>
+          <td class="num" style="color:#4ade80">+6.8%</td>
+          <td class="num">512.5</td>
+          <td><span class="ic ok">✓</span></td>
+          <td><span class="ic ok">✓</span></td>
+          <td><span class="ic ok">✓</span></td>
+          <td><span class="pill warn">回測中</span></td>
+        </tr>
+        
+        <tr>
+          <td><strong>光寶科</strong>　<span class="small">2301</span></td>
+          <td class="num">204.5</td>
+          <td class="num">192.78</td>
+          <td class="num" style="color:#4ade80">+6.1%</td>
+          <td class="num">166.68</td>
+          <td><span class="ic no">✗</span></td>
+          <td><span class="ic ok">✓</span></td>
+          <td><span class="ic ok">✓</span></td>
+          <td><span class="pill neu">未成立</span></td>
+        </tr>
+        
+        <tr>
+          <td><strong>台達電</strong>　<span class="small">2308</span></td>
+          <td class="num">2030.0</td>
+          <td class="num">2116.0</td>
+          <td class="num" style="color:#f87171">-4.1%</td>
+          <td class="num">1509.21</td>
+          <td><span class="ic ok">✓</span></td>
+          <td><span class="ic ok">✓</span></td>
+          <td><span class="ic ok">✓</span></td>
+          <td><span class="pill warn">回測中</span></td>
+        </tr>
+        
+        <tr>
+          <td><strong>巨大</strong>　<span class="small">9921</span></td>
+          <td class="num">70.8</td>
+          <td class="num">69.73</td>
+          <td class="num" style="color:#4ade80">+1.5%</td>
+          <td class="num">78.27</td>
+          <td><span class="ic no">✗</span></td>
+          <td><span class="ic no">✗</span></td>
+          <td><span class="ic no">✗</span></td>
+          <td><span class="pill neu">未成立</span></td>
+        </tr>
+        
+        <tr>
+          <td><strong>美利達</strong>　<span class="small">9914</span></td>
+          <td class="num">70.0</td>
+          <td class="num">61.02</td>
+          <td class="num" style="color:#4ade80">+14.7%</td>
+          <td class="num">71.88</td>
+          <td><span class="ic no">✗</span></td>
+          <td><span class="ic no">✗</span></td>
+          <td><span class="ic no">✗</span></td>
+          <td><span class="pill neu">未成立</span></td>
+        </tr>
+        
+        <tr>
+          <td><strong>奇鋐</strong>　<span class="small">3017</span></td>
+          <td class="num">2495.0</td>
+          <td class="num">2605.0</td>
+          <td class="num" style="color:#f87171">-4.2%</td>
+          <td class="num">1966.32</td>
+          <td><span class="ic ok">✓</span></td>
+          <td><span class="ic ok">✓</span></td>
+          <td><span class="ic ok">✓</span></td>
+          <td><span class="pill warn">回測中</span></td>
+        </tr>
+        
+        <tr>
+          <td><strong>雙鴻</strong>　<span class="small">3324</span></td>
+          <td class="num">1000.0</td>
+          <td class="num">1081.85</td>
+          <td class="num" style="color:#f87171">-7.6%</td>
+          <td class="num">1025.05</td>
+          <td><span class="ic no">✗</span></td>
+          <td><span class="ic no">✗</span></td>
+          <td><span class="ic no">✗</span></td>
+          <td><span class="pill bear">失敗</span></td>
+        </tr>
+        
+        <tr>
+          <td><strong>廣達</strong>　<span class="small">2382</span></td>
+          <td class="num">308.0</td>
+          <td class="num">322.43</td>
+          <td class="num" style="color:#f87171">-4.5%</td>
+          <td class="num">296.21</td>
+          <td><span class="ic no">✗</span></td>
+          <td><span class="ic ok">✓</span></td>
+          <td><span class="ic ok">✓</span></td>
+          <td><span class="pill neu">未成立</span></td>
+        </tr>
+        
+        <tr>
+          <td><strong>緯創</strong>　<span class="small">3231</span></td>
+          <td class="num">140.0</td>
+          <td class="num">139.9</td>
+          <td class="num" style="color:#4ade80">+0.1%</td>
+          <td class="num">136.37</td>
+          <td><span class="ic no">✗</span></td>
+          <td><span class="ic no">✗</span></td>
+          <td><span class="ic no">✗</span></td>
+          <td><span class="pill neu">未成立</span></td>
+        </tr>
+        
+        <tr>
+          <td><strong>台光電</strong>　<span class="small">2383</span></td>
+          <td class="num">4690.0</td>
+          <td class="num">4659.5</td>
+          <td class="num" style="color:#4ade80">+0.7%</td>
+          <td class="num">2845.26</td>
+          <td><span class="ic ok">✓</span></td>
+          <td><span class="ic ok">✓</span></td>
+          <td><span class="ic ok">✓</span></td>
+          <td><span class="pill warn">回測中</span></td>
+        </tr>
+        
+        <tr>
+          <td><strong>聯茂</strong>　<span class="small">6213</span></td>
+          <td class="num">246.5</td>
+          <td class="num">269.38</td>
+          <td class="num" style="color:#f87171">-8.5%</td>
+          <td class="num">171.45</td>
+          <td><span class="ic ok">✓</span></td>
+          <td><span class="ic ok">✓</span></td>
+          <td><span class="ic ok">✓</span></td>
+          <td><span class="pill bull">第一波</span></td>
+        </tr>
+        
+        <tr>
+          <td><strong>南亞科</strong>　<span class="small">2408</span></td>
+          <td class="num">293.0</td>
+          <td class="num">270.4</td>
+          <td class="num" style="color:#4ade80">+8.4%</td>
+          <td class="num">245.11</td>
+          <td><span class="ic no">✗</span></td>
+          <td><span class="ic ok">✓</span></td>
+          <td><span class="ic ok">✓</span></td>
+          <td><span class="pill neu">未成立</span></td>
+        </tr>
+        
+        <tr>
+          <td><strong>華邦電</strong>　<span class="small">2344</span></td>
+          <td class="num">114.0</td>
+          <td class="num">108.68</td>
+          <td class="num" style="color:#4ade80">+4.9%</td>
+          <td class="num">102.72</td>
+          <td><span class="ic no">✗</span></td>
+          <td><span class="ic ok">✓</span></td>
+          <td><span class="ic ok">✓</span></td>
+          <td><span class="pill neu">未成立</span></td>
+        </tr>
+        
+        <tr>
+          <td><strong>上銀</strong>　<span class="small">2049</span></td>
+          <td class="num">373.5</td>
+          <td class="num">337.12</td>
+          <td class="num" style="color:#4ade80">+10.8%</td>
+          <td class="num">251.63</td>
+          <td><span class="ic ok">✓</span></td>
+          <td><span class="ic ok">✓</span></td>
+          <td><span class="ic ok">✓</span></td>
+          <td><span class="pill bull">第一波</span></td>
+        </tr>
+        
+        <tr>
+          <td><strong>大銀微系統</strong>　<span class="small">4576</span></td>
+          <td class="num">248.0</td>
+          <td class="num">230.22</td>
+          <td class="num" style="color:#4ade80">+7.7%</td>
+          <td class="num">147.16</td>
+          <td><span class="ic ok">✓</span></td>
+          <td><span class="ic ok">✓</span></td>
+          <td><span class="ic ok">✓</span></td>
+          <td><span class="pill bull">第一波</span></td>
+        </tr>
+        
+        <tr>
+          <td><strong>金像電</strong>　<span class="small">2368</span></td>
+          <td class="num">1285.0</td>
+          <td class="num">1363.75</td>
+          <td class="num" style="color:#f87171">-5.8%</td>
+          <td class="num">942.79</td>
+          <td><span class="ic ok">✓</span></td>
+          <td><span class="ic ok">✓</span></td>
+          <td><span class="ic ok">✓</span></td>
+          <td><span class="pill warn">回測中</span></td>
+        </tr>
+        
+        <tr>
+          <td><strong>燿華</strong>　<span class="small">2367</span></td>
+          <td class="num">64.1</td>
+          <td class="num">61.43</td>
+          <td class="num" style="color:#4ade80">+4.3%</td>
+          <td class="num">58.33</td>
+          <td><span class="ic no">✗</span></td>
+          <td><span class="ic ok">✓</span></td>
+          <td><span class="ic ok">✓</span></td>
+          <td><span class="pill neu">未成立</span></td>
+        </tr>
+        
+        <tr>
+          <td><strong>所羅</strong>　<span class="small">2359</span></td>
+          <td class="num">134.0</td>
+          <td class="num">122.97</td>
+          <td class="num" style="color:#4ade80">+9.0%</td>
+          <td class="num">121.79</td>
+          <td><span class="ic no">✗</span></td>
+          <td><span class="ic ok">✓</span></td>
+          <td><span class="ic ok">✓</span></td>
+          <td><span class="pill neu">未成立</span></td>
+        </tr>
+        
+        <tr>
+          <td><strong>華晶科</strong>　<span class="small">3059</span></td>
+          <td class="num">43.2</td>
+          <td class="num">40.38</td>
+          <td class="num" style="color:#4ade80">+7.0%</td>
+          <td class="num">38.95</td>
+          <td><span class="ic no">✗</span></td>
+          <td><span class="ic ok">✓</span></td>
+          <td><span class="ic ok">✓</span></td>
+          <td><span class="pill neu">未成立</span></td>
+        </tr>
+        
+        <tr>
+          <td><strong>達明</strong>　<span class="small">4585</span></td>
+          <td class="num">339.0</td>
+          <td class="num">329.95</td>
+          <td class="num" style="color:#4ade80">+2.7%</td>
+          <td class="num">326.61</td>
+          <td><span class="ic no">✗</span></td>
+          <td><span class="ic ok">✓</span></td>
+          <td><span class="ic ok">✓</span></td>
+          <td><span class="pill neu">未成立</span></td>
+        </tr>
+        </tbody>
+    </table>
+    </div>
+    
+  </section>
+
+</main>
+
+<footer>
+  Built 2026-05-21 21:16 ｜ 資料來源：Yahoo Finance、TWSE、TPEX、台灣期交所、集保結算所
+</footer>
+
+</body>
+</html>
