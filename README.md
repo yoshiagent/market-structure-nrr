@@ -11,6 +11,6 @@
 - [`framework.html`](framework.html) — System design document
 - [`weekly/`](weekly/) — Historical weekly reports
 
-Last build: 2026-05-26 18:01
+Last build: 2026-05-27 18:01
 
 `robots.txt` blocks search engine indexing.
